@@ -1,17 +1,24 @@
 package graphql
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 )
 
-type LexerTest struct {
+type PositiveLexerTokenizeTest struct {
 	input    string
 	expected []Token
 }
 
-var lexerTests = []LexerTest{
+type NegativeLexerTokenizeTest struct {
+	input    string
+	expected error
+}
+
+// Positive test case scenarios for Lexer.Tokenize
+var lexerTokenizeTestsPositive = []PositiveLexerTokenizeTest{
 	// Simple punctuator tests
 	{"!", []Token{
 		Token{Type: Exclamation}},
@@ -372,10 +379,65 @@ var lexerTests = []LexerTest{
 	},
 }
 
-// TestLexer preforms tests in the lexerTests table
-func TestLexer(t *testing.T) {
+var lexerTokenizeNegativeTests = []NegativeLexerTokenizeTest{
+	// Spread tests
+	{".", fmt.Errorf("expected ... but found .")},
+	{"..", fmt.Errorf("expected ... but found ..")},
+	{"..>", fmt.Errorf("expected ... but found ..>")},
+	{"....", fmt.Errorf("expected ... but found .")},
 
-	for _, test := range lexerTests {
+	// String tests
+	{"\"", fmt.Errorf("invalid String: ")},
+	{"\"a", fmt.Errorf("invalid String: a")},
+	{"\"Hello, World!", fmt.Errorf("invalid String: Hello, World!")},
+	{"\"This is a string without an ending \\\"", fmt.Errorf("invalid String: This is a string without an ending \"")},
+	{"\"This is a string with an invalid string character \u0000\"", fmt.Errorf("invalid String: This is a string with an invalid string character \u0000")},
+
+	// Escape Sequence tests
+	{"\"\\", fmt.Errorf("invalid escape sequence in String: \\")},
+	{"\"\\ \"", fmt.Errorf("invalid escape sequence character in String: \\ ")},
+	{"\"\\a\"", fmt.Errorf("invalid escape sequence character in String: \\a")},
+	{"\"\\a\\b\"", fmt.Errorf("invalid escape sequence character in String: \\a")},
+	{"\"some stuff\\cother stuff\"", fmt.Errorf("invalid escape sequence character in String: some stuff\\c")},
+
+	{"\"\\u\"", fmt.Errorf("invalid escaped unicode value in String: \\u\"")},
+	{"\"\\u0\"", fmt.Errorf("invalid escaped unicode value in String: \\u0\"")},
+	{"\"\\u12\"", fmt.Errorf("invalid escaped unicode value in String: \\u12\"")},
+	{"\"\\u34A\"", fmt.Errorf("invalid escaped unicode value in String: \\u34A\"")},
+	{"\"\\uG\"", fmt.Errorf("invalid escaped unicode value in String: \\uG")},
+	{"\"\\u123x\"", fmt.Errorf("invalid escaped unicode value in String: \\u123x")},
+
+	// Invalid token tests (starting characters)
+	{"?", fmt.Errorf("invalid character: ?")},
+	{"^", fmt.Errorf("invalid character: ^")},
+	{"\u0000", fmt.Errorf("invalid character: \u0000")},
+	{"\uFFFF", fmt.Errorf("invalid character: \uFFFF")},
+	{"abc 123 \uFFFF", fmt.Errorf("invalid character: \uFFFF")},
+	{"ilike\uBEEFdoyou?", fmt.Errorf("invalid character: \uBEEF")},
+	{"noiamv\u000Eg\u000An", fmt.Errorf("invalid character: \u000E")},
+
+	// Integer tests
+	{"-", fmt.Errorf("invalid Integer: -")},
+
+	// Float tests
+	{"1.", fmt.Errorf("invalid Float: 1.")},
+	{"5.", fmt.Errorf("invalid Float: 5.")},
+	{"2e", fmt.Errorf("invalid Float: 2e")},
+	{"3.1e", fmt.Errorf("invalid Float: 3.1e")},
+	{"4.2E", fmt.Errorf("invalid Float: 4.2E")},
+	{"5.3e+", fmt.Errorf("invalid Float: 5.3e+")},
+	{"56.34E+", fmt.Errorf("invalid Float: 56.34E+")},
+	{"78.45e-", fmt.Errorf("invalid Float: 78.45e-")},
+	{"87.56E-", fmt.Errorf("invalid Float: 87.56E-")},
+}
+
+// TestLexer preforms tests in the Lexer.Tokenize test tables:
+// lexerTokenizePositiveTests
+// lexerTokenizeNegativeTests
+func TestLexerTokenize(t *testing.T) {
+
+	// Positive test cases
+	for _, test := range lexerTokenizeTestsPositive {
 
 		actual, _ := Tokenize(strings.NewReader(test.input))
 
@@ -390,9 +452,20 @@ func TestLexer(t *testing.T) {
 		}
 
 		if actual[len(actual)-1].Type != EOF {
-			t.Errorf("Tokenize(%s): Final token was not an EOF type token", test.input)
+			t.Errorf("Tokenize(%s): Final token type was not EOF, but was %s", test.input, actual[len(actual)-1].Type)
+		}
+	}
+
+	// Negative test cases
+	for _, test := range lexerTokenizeNegativeTests {
+		_, actual := Tokenize(strings.NewReader(test.input))
+
+		if actual == nil {
+			t.Errorf("Tokenize(%s): Expected error, but was nil", test.input)
+		}
+
+		if !reflect.DeepEqual(test.expected, actual) {
+			t.Errorf("Tokenize(%s): Expected error '%s', but got error '%s'", test.input, test.expected, actual)
 		}
 	}
 }
-
-// TODO lexer error tests

@@ -376,16 +376,21 @@ var lexerTests = []LexerTest{
 func TestLexer(t *testing.T) {
 
 	for _, test := range lexerTests {
-		var actual []Token
-		lexer := NewLexer(strings.NewReader(test.input))
 
-		// TODO handle errors here, or better just write lexer.Tokenize(io.Reader)
-		for token, _ := lexer.NextToken(); token.Type != EOF; token, _ = lexer.NextToken() {
-			actual = append(actual, token)
+		actual, _ := Tokenize(strings.NewReader(test.input))
+
+		if len(actual) < 1 {
+			t.Errorf("Tokenize(%s): Returned no tokens", test.input)
 		}
 
-		if !reflect.DeepEqual(test.expected, actual) {
-			t.Errorf("Lexer(%s): expected %v, actual %v", test.input, test.expected, actual)
+		for i := 0; i < len(actual)-1; i++ {
+			if !reflect.DeepEqual(test.expected[i], actual[i]) {
+				t.Errorf("Lexer(%s): expected %v, actual %v", test.input, test.expected, actual)
+			}
+		}
+
+		if actual[len(actual)-1].Type != EOF {
+			t.Errorf("Tokenize(%s): Final token was not an EOF type token", test.input)
 		}
 	}
 }

@@ -12,6 +12,8 @@ type Token struct {
 //go:generate stringer -type=TokenType
 type TokenType int
 
+var InvalidToken Token = Token{Type: Invalid}
+
 // Lexical tokens for GraphQL
 const (
 	// Special tokens

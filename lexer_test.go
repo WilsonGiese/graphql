@@ -383,13 +383,13 @@ var lexerTokenizeNegativeTests = []NegativeLexerTokenizeTest{
 	// Spread tests
 	{".", fmt.Errorf("expected ... but found .")},
 	{"..", fmt.Errorf("expected ... but found ..")},
-	{"..>", fmt.Errorf("expected ... but found ..>")},
 	{"....", fmt.Errorf("expected ... but found .")},
+	{"..>", fmt.Errorf("expected ... but found ..>")},
 
 	// String tests
 	{"\"", fmt.Errorf("invalid String: ")},
 	{"\"a", fmt.Errorf("invalid String: a")},
-	{"\"Hello, World!", fmt.Errorf("invalid String: Hello, World!")},
+	{"\"Hello, World", fmt.Errorf("invalid String: Hello, World")},
 	{"\"This is a string without an ending \\\"", fmt.Errorf("invalid String: This is a string without an ending \"")},
 	{"\"This is a string with an invalid string character \u0000\"", fmt.Errorf("invalid String: This is a string with an invalid string character \u0000")},
 
@@ -421,9 +421,13 @@ var lexerTokenizeNegativeTests = []NegativeLexerTokenizeTest{
 
 	// Float tests
 	{"1.", fmt.Errorf("invalid Float: 1.")},
+	{"-1.", fmt.Errorf("invalid Float: -1.")},
 	{"5.", fmt.Errorf("invalid Float: 5.")},
+	{"-5.", fmt.Errorf("invalid Float: -5.")},
 	{"2e", fmt.Errorf("invalid Float: 2e")},
+	{"-2e", fmt.Errorf("invalid Float: -2e")},
 	{"3.1e", fmt.Errorf("invalid Float: 3.1e")},
+	{"-3.1e", fmt.Errorf("invalid Float: -3.1e")},
 	{"4.2E", fmt.Errorf("invalid Float: 4.2E")},
 	{"5.3e+", fmt.Errorf("invalid Float: 5.3e+")},
 	{"56.34E+", fmt.Errorf("invalid Float: 56.34E+")},

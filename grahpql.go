@@ -6,7 +6,7 @@ type Document struct {
 type Operation struct {
 	operationType string
 	operationName string
-	variables     []Variable
+	variables     []VariableDefinition
 	directives    Directives
 	selectionSet  SelectionSet
 }
@@ -14,7 +14,7 @@ type Operation struct {
 type Fragment struct {
 }
 
-type Variable struct {
+type VariableDefinition struct {
 	Name    string
 	Type    Type
 	Default Value

@@ -60,7 +60,7 @@ func (p *Parser) parseDocument() Document {
 // SelectionSet
 func (p *Parser) parseOperation(operationType string) Operation {
 	operationName, _ := p.optional(Name)
-	variables := p.parseVariables()
+	variables := p.parseVariableDefinitions()
 	directives := p.parseDirectives()
 	selectionSet := p.parseSelectionSet()
 
@@ -77,8 +77,7 @@ func (p *Parser) parseFragment() Fragment {
 	return Fragment{}
 }
 
-func (p *Parser) parseVariables() (variables []Variable) {
-
+func (p *Parser) parseVariableDefinitions() (varDefs []VariableDefinition) {
 	p.expect(OpenParen)
 	for {
 		token := p.peek()
@@ -87,27 +86,21 @@ func (p *Parser) parseVariables() (variables []Variable) {
 			break
 		}
 
-		p.expect(Dollar)
-		variableName := p.expect(Name)
-		p.expect(Colon)
-		variableType := p.parseType()
-
-		_, defaultGiven := p.optional(Equals)
-
-		if defaultGiven {
-			switch p.peek().Type {
-			case Name:
-			case String:
-			case Integer:
-			case Float:
-			}
-		}
-
-		//variableDefaultValue := p.parseValue()
-
+		varDefs = append(varDefs, p.parseVariableDefinition())
 	}
 	p.expect(ClosedParen)
+	return
+}
 
+func (p *Parser) parseVariableDefinition() (varDef VariableDefinition) {
+	p.expect(Dollar)
+	varDef.Name = p.expect(Name).Value
+	p.expect(Colon)
+	varDef.Type = p.parseType()
+
+	if _, defaultGiven := p.optional(Equals); defaultGiven {
+		varDef.Default = p.parseValue()
+	}
 	return
 }
 
@@ -134,6 +127,66 @@ func (p *Parser) _parseType() (t Type) {
 		t.Type = p.expect(Name).Value
 	}
 
+	return
+}
+
+func (p *Parser) parseValue() (v Value) {
+	token := p.peek()
+	switch p.peek().Type {
+	case Name:
+		fallthrough
+	case String:
+		fallthrough
+	case Integer:
+		fallthrough
+	case Float:
+		p.take()
+		v.Value = token.Value
+	case OpenBracket:
+		v.Value = p.parseListValue()
+	case OpenBrace:
+		v.Value = p.parseObjectValue()
+	default:
+		unexpected(token.Type.String(), "Value")
+	}
+
+	return
+}
+
+func (p *Parser) parseListValue() (values []Value) {
+	p.expect(OpenBracket)
+	for {
+		token := p.peek()
+
+		if token.Type == ClosedBracket {
+			break
+		}
+
+		values = append(values, p.parseValue())
+	}
+	p.expect(ClosedBracket)
+	return
+}
+
+func (p *Parser) parseObjectValue() (object map[string]Value) {
+	p.expect(OpenBrace)
+	for {
+		token := p.peek()
+
+		if token.Type == ClosedBrace {
+			break
+		}
+
+		name := p.expect(Name)
+		p.expect(Colon)
+		value := p.parseValue()
+
+		if _, exists := object[name.Value]; exists {
+			invalid("duplicate field name in object value")
+		}
+		object[name.Value] = value
+	}
+	p.expect(ClosedBrace)
 	return
 }
 
@@ -203,4 +256,8 @@ func (p *Parser) optional(t TokenType) (Token, bool) {
 
 func unexpected(actual string, expected ...string) {
 	panic(fmt.Errorf("Expected %s but found %s", strings.Join(expected, " or "), actual))
+}
+
+func invalid(message string) {
+	panic(fmt.Errorf("invalid: %s", message))
 }

@@ -91,6 +91,18 @@ func (p *Parser) parseVariables() (variables []Variable) {
 		variableName := p.expect(Name)
 		p.expect(Colon)
 		variableType := p.parseType()
+
+		_, defaultGiven := p.optional(Equals)
+
+		if defaultGiven {
+			switch p.peek().Type {
+			case Name:
+			case String:
+			case Integer:
+			case Float:
+			}
+		}
+
 		//variableDefaultValue := p.parseValue()
 
 	}
@@ -99,7 +111,16 @@ func (p *Parser) parseVariables() (variables []Variable) {
 	return
 }
 
-func (p *Parser) parseType() (t Type) {
+func (p *Parser) parseType() Type {
+	t := p._parseType()
+
+	_, nonNull := p.optional(Exclamation)
+	t.NonNull = nonNull
+
+	return t
+}
+
+func (p *Parser) _parseType() (t Type) {
 	token := p.peek()
 
 	if token.Type == OpenBracket {
@@ -107,24 +128,10 @@ func (p *Parser) parseType() (t Type) {
 		subType := p.parseType()
 		p.expect(ClosedBracket)
 
-		t.Type = ListType
+		t.List = true
 		t.SubType = &subType
 	} else {
-		name := p.accept(Name) // TODO accept
-		switch name.Value {
-		case "Int":
-			t.Type = IntegerType
-		case "Float":
-			t.Type = FloatType
-		case "Boolean":
-			t.Type = BooleanType
-		case "String":
-			t.Type = StringType
-		case "Enum":
-			t.Type = EnumType
-		default:
-			t.Type = ObjectType
-		}
+		t.Type = p.expect(Name).Value
 	}
 
 	return

@@ -23,26 +23,25 @@ type Variable struct {
 type ValueType int
 
 const (
-	NullType ValueType = iota
-	VariableType
+	ObjectType ValueType = iota
 	IntegerType
 	FloatType
 	StringType
 	BooleanType
 	EnumType
 	ListType
-	ObjectType
 )
 
 type Value struct {
-	Type  ValueType
+	Type  Type
 	Value interface{}
 }
 
 type Type struct {
-	Type    ValueType
-	SubType *Type
+	Type    string
 	NonNull bool
+	List    bool
+	SubType *Type
 }
 
 // {Type: List, SubType: {Type: String, SubType: nil}}

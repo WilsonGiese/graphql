@@ -38,7 +38,7 @@ type lexer struct {
 }
 
 // Lexer errors
-var notEnoughMatchingRunes = errors.New("not enough matching runes to read")
+var errNotEnoughMatchingRunes = errors.New("not enough matching runes to read")
 
 // nextToken returns the next token and position from the underlying reader.
 // Also returns the literal text read for strings, numbers, and duration tokens
@@ -88,7 +88,7 @@ func (l *lexer) nextToken() (Token, error) {
 		if s, err := l.consume(2, isPeriod); err == nil {
 			token = Token{Type: Spread}
 		} else {
-			if err == io.EOF || err == notEnoughMatchingRunes {
+			if err == io.EOF || err == errNotEnoughMatchingRunes {
 				return InvalidToken, fmt.Errorf("expected ... but found %c%s", r, s)
 			}
 			return InvalidToken, err
@@ -190,7 +190,7 @@ func (l *lexer) consume(n int, matches func(rune) bool) (string, error) {
 		if r, _, err := l.reader.ReadRune(); err == nil {
 			consumed.WriteRune(r)
 			if !matches(r) {
-				return consumed.String(), notEnoughMatchingRunes
+				return consumed.String(), errNotEnoughMatchingRunes
 			}
 		} else {
 			return consumed.String(), err
@@ -281,7 +281,7 @@ func (l *lexer) consumeStringEscapeSequence(value *bytes.Buffer) error {
 				return nil
 			}
 
-			if err == io.EOF || err == notEnoughMatchingRunes {
+			if err == io.EOF || err == errNotEnoughMatchingRunes {
 				return fmt.Errorf("invalid escaped unicode value in String: %s%c%c%s", value.String(), '\\', r, unicodeHexString)
 			}
 			return err

@@ -11,7 +11,7 @@ type Parser struct {
 	position int
 }
 
-func (p *Parser) parse() (err error) {
+func (p *Parser) parse() (document Document, err error) {
 
 	// Defer function to recover from a panic during parsing, and finally return
 	// the panic back as a proper error
@@ -21,7 +21,7 @@ func (p *Parser) parse() (err error) {
 		}
 	}()
 
-	p.parseDocument()
+	document = p.parseDocument()
 
 	return
 }
@@ -58,23 +58,37 @@ func (p *Parser) parseDocument() Document {
 // OperationDefinition
 // OperationType Name(opt) VariableDefinitions(opt) Directives(opt) SelectionSet
 // SelectionSet
-func (p *Parser) parseOperation(operationType string) Operation {
-	operationName, _ := p.optional(Name)
-	variables := p.parseVariableDefinitions()
-	directives := p.parseDirectives()
-	selectionSet := p.parseSelectionSet()
+func (p *Parser) parseOperation(operationType string) (operation Operation) {
+	operation.Type = operationType
 
-	return Operation{
-		operationType: operationType,
-		operationName: operationName.Value,
-		variables:     variables,
-		directives:    directives,
-		selectionSet:  selectionSet,
+	if name, containsName := p.optional(Name); containsName {
+		operation.Name = name.Value
 	}
+
+	operation.VariableDefinitions = p.parseVariableDefinitions()
+	operation.Directives = p.parseDirectives()
+	operation.SelectionSet = p.parseSelectionSet()
+	return
 }
 
-func (p *Parser) parseFragment() Fragment {
-	return Fragment{}
+func (p *Parser) parseFragment() (fragment Fragment) {
+	fragment.Name = p.expect(Name).Value
+	fragment.Type = p.parseTypeCondition()
+	fragment.Directives = p.parseDirectives()
+	fragment.SelectionSet = p.parseSelectionSet()
+	return
+}
+
+func (p *Parser) parseTypeCondition() string {
+	if token := p.peek(); token.Type == Name {
+		if token.Value != "on" {
+			unexpected(token.Value, "on")
+		}
+		p.take()
+	} else {
+		unexpected(token.Type.String(), "on")
+	}
+	return p.expect(Name).Value
 }
 
 func (p *Parser) parseVariableDefinitions() (varDefs []VariableDefinition) {
@@ -114,9 +128,7 @@ func (p *Parser) parseType() Type {
 }
 
 func (p *Parser) _parseType() (t Type) {
-	token := p.peek()
-
-	if token.Type == OpenBracket {
+	if p.peek().Type == OpenBracket {
 		p.expect(OpenBracket)
 		subType := p.parseType()
 		p.expect(ClosedBracket)
@@ -126,7 +138,6 @@ func (p *Parser) _parseType() (t Type) {
 	} else {
 		t.Type = p.expect(Name).Value
 	}
-
 	return
 }
 
@@ -149,16 +160,13 @@ func (p *Parser) parseValue() (v Value) {
 	default:
 		unexpected(token.Type.String(), "Value")
 	}
-
 	return
 }
 
 func (p *Parser) parseListValue() (values []Value) {
 	p.expect(OpenBracket)
 	for {
-		token := p.peek()
-
-		if token.Type == ClosedBracket {
+		if p.peek().Type == ClosedBracket {
 			break
 		}
 
@@ -171,9 +179,7 @@ func (p *Parser) parseListValue() (values []Value) {
 func (p *Parser) parseObjectValue() (object map[string]Value) {
 	p.expect(OpenBrace)
 	for {
-		token := p.peek()
-
-		if token.Type == ClosedBrace {
+		if p.peek().Type == ClosedBrace {
 			break
 		}
 
@@ -190,14 +196,118 @@ func (p *Parser) parseObjectValue() (object map[string]Value) {
 	return
 }
 
-func (p *Parser) parseDirectives() Directives {
-	return Directives{}
+func (p *Parser) parseDirectives() (directives []Directive) {
+	for {
+		if p.peek().Type != At {
+			break
+		}
+
+		directives = append(directives, p.parseDirective())
+	}
+	return
 }
 
-func (p *Parser) parseSelectionSet() SelectionSet {
+func (p *Parser) parseDirective() (directive Directive) {
+	p.expect(At)
+	name := p.expect(Name).Value
+	arguments := p.parseArguments()
+
+	directive.Name = name
+	directive.Arguments = arguments
+	return
+}
+
+func (p *Parser) parseArguments() (arguments map[string]Value) {
+	p.expect(OpenParen)
+	for {
+		if p.peek().Type == Name {
+			break
+		}
+
+		name := p.expect(Name)
+		p.expect(Colon)
+		value := p.parseValue()
+
+		if _, exists := arguments[name.Value]; exists {
+			invalid("duplicate argument in arguments list")
+		}
+		arguments[name.Value] = value
+	}
+	p.expect(ClosedParen)
+	return
+}
+
+func (p *Parser) parseSelectionSet() (selectionSet SelectionSet) {
 	p.expect(OpenBrace)
+	for {
+		token := p.peek()
+
+		if token.Type != Name && token.Type != Spread {
+			break
+		}
+
+		// Spread indicates a Fragment Spread or an Inline Fragment
+		// Fragment Spread must start with a Name that is not "on".
+		// Inline Fragment optionally starts with a type condition (on Name),
+		// followed optionally by directives, followed finally by a selection set
+		if token.Type == Spread {
+			lookahead := p.lookahead(1)
+			if lookahead.Type == Name {
+				if lookahead.Value == "on" {
+					selectionSet.InlineFragments = append(selectionSet.InlineFragments, p.parseInlineFragment())
+				} else {
+					selectionSet.FragmentSpreads = append(selectionSet.FragmentSpreads, p.parseFragmentSpread())
+				}
+			} else if lookahead.Type == At || lookahead.Type == OpenBrace {
+				selectionSet.InlineFragments = append(selectionSet.InlineFragments, p.parseInlineFragment())
+			} else {
+				unexpected(lookahead.Type.String(), "fragment spread or inline fragment")
+			}
+		} else {
+			selectionSet.Fields = append(selectionSet.Fields, p.parseField())
+		}
+	}
 	p.expect(ClosedBrace)
-	return SelectionSet{}
+	return
+}
+
+func (p *Parser) parseFragmentSpread() (fragmentSpread FragmentSpread) {
+	p.expect(Spread)
+	fragmentSpread.Type = p.expect(Name).Value
+	fragmentSpread.Directives = p.parseDirectives()
+
+	return
+}
+
+func (p *Parser) parseInlineFragment() (inlineFragment InlineFragment) {
+	p.expect(Spread)
+	inlineFragment.Type = p.parseTypeCondition()
+	inlineFragment.Directives = p.parseDirectives()
+	inlineFragment.SelectionSet = p.parseSelectionSet()
+	return
+}
+
+func (p *Parser) parseField() (field Field) {
+	field.Name = p.expect(Name).Value
+
+	if p.peek().Type == Colon {
+		field.Alias = field.Name
+		field.Name = p.expect(Name).Value
+	}
+
+	if p.peek().Type == OpenParen {
+		field.Arguments = p.parseArguments()
+	}
+
+	// Directives
+	if p.peek().Type == At {
+		field.Directives = p.parseDirectives()
+	}
+
+	if p.peek().Type == OpenBrace {
+		field.SelectionSet = p.parseSelectionSet()
+	}
+	return
 }
 
 func (p *Parser) accept(t TokenType, values ...string) Token {
@@ -218,6 +328,13 @@ func (p *Parser) accept(t TokenType, values ...string) Token {
 
 func (p *Parser) peek() Token {
 	return p.tokens[p.position]
+}
+
+func (p *Parser) lookahead(distance int) Token {
+	if p.position+distance >= len(p.tokens) {
+		return p.tokens[len(p.tokens)-1]
+	}
+	return p.tokens[p.position+distance]
 }
 
 func (p *Parser) take() Token {

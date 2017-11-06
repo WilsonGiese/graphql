@@ -12,7 +12,7 @@ func TestParser(t *testing.T) {
 
 	parser := Parser{tokens: tokens}
 
-	err := parser.parse()
+	_, err := parser.parse()
 	if err != nil {
 		t.Error(err)
 	}

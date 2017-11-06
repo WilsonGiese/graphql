@@ -4,14 +4,11 @@ type Document struct {
 }
 
 type Operation struct {
-	operationType string
-	operationName string
-	variables     []VariableDefinition
-	directives    Directives
-	selectionSet  SelectionSet
-}
-
-type Fragment struct {
+	Type                string
+	Name                string
+	VariableDefinitions []VariableDefinition
+	Directives          []Directive
+	SelectionSet        SelectionSet
 }
 
 type VariableDefinition struct {
@@ -49,8 +46,39 @@ type Type struct {
 type Object struct {
 }
 
-type Directives struct {
+type Directive struct {
+	Name      string
+	Arguments map[string]Value
 }
 
 type SelectionSet struct {
+	Fields          []Field
+	InlineFragments []InlineFragment
+	FragmentSpreads []FragmentSpread
+}
+
+type Fragment struct {
+	Name         string
+	Type         string
+	Directives   []Directive
+	SelectionSet SelectionSet
+}
+
+type InlineFragment struct {
+	Type         string
+	Directives   []Directive
+	SelectionSet SelectionSet
+}
+
+type FragmentSpread struct {
+	Type       string
+	Directives []Directive
+}
+
+type Field struct {
+	Name         string
+	Alias        string
+	Arguments    map[string]Value
+	Directives   []Directive
+	SelectionSet SelectionSet
 }

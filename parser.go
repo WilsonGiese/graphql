@@ -20,23 +20,16 @@ func (p *Parser) parse() (document Document, err error) {
 			err = r.(error)
 		}
 	}()
-
 	document = p.parseDocument()
-
 	return
 }
 
-func (p *Parser) parseDocument() Document {
+func (p *Parser) parseDocument() (document Document) {
 	// A document starts with an OpenBrace if it is using query short-hand syntax,
 	// otherwise a document is a list of Operations with their type stated
 	if p.peek().Type == OpenBrace {
-
-		p.parseSelectionSet()
-		p.expect(EOF)
+		document.Operations = append(document.Operations, Operation{SelectionSet: p.parseSelectionSet()})
 	} else {
-		var operations []Operation
-		var fragments []Fragment
-
 		for {
 			token := p.peek()
 			if token.Type == EOF {
@@ -45,12 +38,13 @@ func (p *Parser) parseDocument() Document {
 			defintionType := p.accept(Name, "query", "mutation", "fragment").Value
 
 			if defintionType == "fragment" {
-				fragments = append(fragments, p.parseFragment())
+				document.Fragments = append(document.Fragments, p.parseFragment())
 			} else {
-				operations = append(operations, p.parseOperation(defintionType))
+				document.Operations = append(document.Operations, p.parseOperation(defintionType))
 			}
 		}
 	}
+	p.expect(EOF)
 
 	return Document{}
 }
@@ -118,16 +112,7 @@ func (p *Parser) parseVariableDefinition() (varDef VariableDefinition) {
 	return
 }
 
-func (p *Parser) parseType() Type {
-	t := p._parseType()
-
-	_, nonNull := p.optional(Exclamation)
-	t.NonNull = nonNull
-
-	return t
-}
-
-func (p *Parser) _parseType() (t Type) {
+func (p *Parser) parseType() (t Type) {
 	if p.peek().Type == OpenBracket {
 		p.expect(OpenBracket)
 		subType := p.parseType()
@@ -138,6 +123,10 @@ func (p *Parser) _parseType() (t Type) {
 	} else {
 		t.Type = p.expect(Name).Value
 	}
+
+	_, nonNull := p.optional(Exclamation)
+	t.NonNull = nonNull
+
 	return
 }
 

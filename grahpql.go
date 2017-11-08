@@ -1,6 +1,8 @@
 package graphql
 
 type Document struct {
+	Operations []Operation
+	Fragments  []Fragment
 }
 
 type Operation struct {

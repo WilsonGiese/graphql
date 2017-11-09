@@ -43,8 +43,6 @@ type Type struct {
 	SubType *Type
 }
 
-// {Type: List, SubType: {Type: String, SubType: nil}}
-
 type Object struct {
 }
 
@@ -83,4 +81,40 @@ type Field struct {
 	Arguments    map[string]Value
 	Directives   []Directive
 	SelectionSet SelectionSet
+}
+
+type Schema struct {
+}
+
+type EnumSchema struct {
+	Name   string
+	Values []string
+}
+
+type InterfaceSchema struct {
+	Name   string
+	Fields map[string]Type
+}
+
+type TypeSchema struct {
+	Name       string
+	Implements string
+	Fields
+}
+
+type TypeFieldSchema struct {
+	Name      string
+	Type      Type
+	Arguments map[string]Argument
+}
+
+type Argument struct {
+	Name    string
+	Type    Type
+	Default Value
+}
+
+type UnionSchema struct {
+	Name  string
+	Types []string
 }

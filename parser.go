@@ -25,105 +25,6 @@ func (p *Parser) parse() (document Document, err error) {
 	return
 }
 
-func (p *Parser) parseSchema() (schema Schema, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = r.(error)
-		}
-	}()
-	schema = p.parseSchemaDocument()
-	return
-}
-
-func (p *Parser) parseSchemaDocument() (schema Schema) {
-	for {
-		token := p.peek()
-
-		if token.Type != Name {
-			unexpected(token.Type.String(), "enum or interface or type or union")
-		}
-
-		if token.Value = "schema" {
-
-		}
-
-		switch token.Value {
-		case "enum":
-			p.parseEnumSchema()
-		case "input":
-
-		case "interface":
-			p.parseInterfaceSchema()
-		case "scalar":
-
-		case "type":
-			p.parseTypeSchema()
-		case "union":
-			p.parseUnionSchema()
-
-		default:
-			unexpected(token.Value, "enum or interface or type or union")
-		}
-	}
-	return
-}
-
-func (p *Parser) parseEnumSchema() (enumSchema EnumSchema) {
-	p.expect(Name)
-	enumSchema.Name = p.expect(Name).Value
-	p.expect(OpenBrace)
-	for {
-		if p.peek().Type == ClosedBrace {
-			break
-		}
-
-		enumSchema.Values = append(enumSchema.Values, p.expect(Name).Value)
-	}
-	p.expect(ClosedBrace)
-	return
-}
-
-func (p *Parser) parseInterfaceSchema() (interfaceSchema InterfaceSchema) {
-	p.expect(Name)
-	interfaceSchema.Name = p.expect(Name).Value
-	p.expect(OpenBrace)
-	for {
-		if p.peek().Type == ClosedBrace {
-			break
-		}
-
-		fieldName := p.expect(Name).Value
-		p.expect(Colon)
-		fieldType := p.parseType()
-
-		if _, exists := interfaceSchema.Fields[fieldName]; exists {
-			invalid(fmt.Sprintf("field %s defined more than once in schema interface %s", fieldName, interfaceSchema.Name))
-		}
-		interfaceSchema.Fields[fieldName] = fieldType
-	}
-	p.expect(ClosedBrace)
-	return
-}
-
-func (p *Parser) parseTypeSchema() (typeSchema TypeSchema) {
-	return
-}
-
-func (p *Parser) parseUnionSchema() (unionSchema UnionSchema) {
-	p.expect(Name)
-	unionSchema.Name = p.expect(Name).Value
-	p.expect(Equals)
-	for {
-		unionSchema.Types = append(unionSchema.Types, p.expect(Name).Value)
-
-		if p.peek().Type != VerticalBar {
-			break
-		}
-		p.take()
-	}
-	return
-}
-
 func (p *Parser) parseDocument() (document Document) {
 	// A document starts with an OpenBrace if it is using query short-hand syntax,
 	// otherwise a document is a list of Operations with their type stated
@@ -159,7 +60,10 @@ func (p *Parser) parseOperation(operationType string) (operation Operation) {
 		operation.Name = name.Value
 	}
 
-	operation.VariableDefinitions = p.parseVariableDefinitions()
+	if p.peek().Type == OpenParen {
+		operation.VariableDefinitions = p.parseVariableDefinitions()
+	}
+
 	operation.Directives = p.parseDirectives()
 	operation.SelectionSet = p.parseSelectionSet()
 	return

@@ -1,38 +1,46 @@
 package graphql
 
+// Schema describes the structure and behavior of a GraphQL service
 type Schema struct {
 }
 
+// Scalar describes a scalar type within a Schema
 type Scalar struct {
 	Name        string
 	Description string
 }
 
+// EnumSchema describes an enum type within a Schema
 type EnumSchema struct {
 	Name        string
 	Values      []string
 	Description string
 }
 
+// InputSchema describes an input type object within a Schema
 type InputSchema struct {
 	Name        string
 	Description string
 }
 
+// Fields represents a map from field names (strings) to a TypeSchema
 type Fields map[string]TypeSchema
 
+// InterfaceSchema descrives an object type interface within a Schema
 type InterfaceSchema struct {
 	Name        string
 	Description string
 	Fields      Fields
 }
 
+// UnionSchema describes a union of Types within a Schema
 type UnionSchema struct {
 	Name        string
 	Description string
 	Types       []ObjectSchema
 }
 
+// ObjectSchema describes an Object Type defined within a Schema
 type ObjectSchema struct {
 	Name        string
 	Implements  InterfaceSchema
@@ -40,15 +48,18 @@ type ObjectSchema struct {
 	Fields      ObjectFields
 }
 
+// ObjectFieldSchema describes a Field for a Type defined within a Schema
 type ObjectFieldSchema struct {
 	Name        string
 	Description string
 	Type        TypeSchema
-	Arguments
+	Arguments   Arguments
 }
 
+// ObjectFields represents a map of field names (strings) to an ObjectFieldSchema
 type ObjectFields map[string]ObjectFieldSchema
 
+// TypeSchema represents a Type in a Schema
 type TypeSchema struct {
 	Name    string
 	NonNull bool
@@ -56,32 +67,37 @@ type TypeSchema struct {
 	SubType *TypeSchema
 }
 
+// ArgumentSchema defines an argument for a Field defined within a Type
 type ArgumentSchema struct {
 	Name    string
 	Type    TypeSchema
 	Default interface{}
 }
 
+// Arguments represents a map from argument names (strings) to an ArgumentSchema
 type Arguments map[string]ArgumentSchema
 
-// Type helpers
+// DescribeType returns a TypeSchema for the given type which can be null
 func DescribeType(name string) (t TypeSchema) {
 	t.Name = name
 	return
 }
 
+// DescribeNonNullType returns a non-null TypeSchema for the given type
 func DescribeNonNullType(name string) (t TypeSchema) {
 	t.Name = name
 	t.NonNull = true
 	return
 }
 
+// DescribeListType returns a TypeSchema for the given subType which can be null
 func DescribeListType(subType TypeSchema) (t TypeSchema) {
 	t.List = true
 	t.SubType = &subType
 	return
 }
 
+// DescribeNonNullListType returns a non-null TypeSchema for the given subType
 func DescribeNonNullListType(subType TypeSchema) (t TypeSchema) {
 	t.List = true
 	t.NonNull = true
@@ -89,22 +105,37 @@ func DescribeNonNullListType(subType TypeSchema) (t TypeSchema) {
 	return
 }
 
-// Common Pre-defined Types
+// Common Pre-defined Types (Int, Float, String, Boolean, ID)
+
+// StringType is a TypeSchema for a String which can be null
 var StringType = DescribeType("String")
 
+// NonNullStringType is a TypeSchema for String a string which cannot be null
 var NonNullStringType = DescribeNonNullType("String")
 
+// IntType is a TypeSchema for an Int which can be null
 var IntType = DescribeType("Int")
 
+// NonNullIntType is a TypeSchema for an Int which cannot be null
 var NonNullIntType = DescribeNonNullType("Int")
 
+// FloatType is a TypeSchema for a Float which can be null
 var FloatType = DescribeType("Float")
 
+// NonNullFloatType is a TypeSchema for a Float which cannot be null
 var NonNullFloatType = DescribeNonNullType("Float")
 
+// BooleanType is a TypeSchema for a Boolean which can be null
 var BooleanType = DescribeType("Boolean")
 
+// NonNullBooleanType is a TypeSchema for a Boolean which cannot be null
 var NonNullBooleanType = DescribeNonNullType("Boolean")
+
+// IDType is a TypeSchema for an ID which can be null
+var IDType = DescribeType("ID")
+
+// NonNullIDType is a TypeSchema for an ID which cannot be null
+var NonNullIDType = DescribeNonNullType("ID")
 
 ///
 // Example Schema (Test)

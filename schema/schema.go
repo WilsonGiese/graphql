@@ -12,9 +12,20 @@ type Schema struct {
 	unions     map[string]*Union
 }
 
+func newSchema() *Schema {
+	return &Schema{
+		enums:      make(map[string]*Enum),
+		inputs:     make(map[string]*Input),
+		interfaces: make(map[string]*Interface),
+		objects:    make(map[string]*Object),
+		scalars:    make(map[string]*Scalar),
+		unions:     make(map[string]*Union),
+	}
+}
+
 // Declaration represents a declared Type in the GraphQL Schema
 type Declaration interface {
-	TypeKind() TypeKind
+	typeKind() TypeKind
 }
 
 // TypeKind represents the type of a Schema declaration
@@ -42,7 +53,7 @@ type Scalar struct {
 }
 
 // TypeKind returns the TypeKind of Scalar
-func (scalar Scalar) TypeKind() TypeKind {
+func (scalar Scalar) typeKind() TypeKind {
 	return SCALAR
 }
 
@@ -54,7 +65,7 @@ type Enum struct {
 }
 
 // TypeKind returns the TypeKind of Enum
-func (enum Enum) TypeKind() TypeKind {
+func (enum Enum) typeKind() TypeKind {
 	return ENUM
 }
 
@@ -66,7 +77,7 @@ type Input struct {
 }
 
 // TypeKind returns the TypeKind of Input
-func (input Input) TypeKind() TypeKind {
+func (input Input) typeKind() TypeKind {
 	return INPUT_OBJECT
 }
 
@@ -78,7 +89,7 @@ type Interface struct {
 }
 
 // TypeKind returns the TypeKind of Interface
-func (i Interface) TypeKind() TypeKind {
+func (intrface Interface) typeKind() TypeKind {
 	return INTERFACE
 }
 
@@ -90,7 +101,7 @@ type Union struct {
 }
 
 // TypeKind returns the TypeKind of Union
-func (union Union) TypeKind() TypeKind {
+func (union Union) typeKind() TypeKind {
 	return UNION
 }
 
@@ -103,7 +114,7 @@ type Object struct {
 }
 
 // TypeKind returns the TypeKind of Object
-func (object Object) TypeKind() TypeKind {
+func (object Object) typeKind() TypeKind {
 	return OBJECT
 }
 
@@ -134,20 +145,19 @@ type Argument struct {
 // Schema Builder
 ///
 
-// Builder builds a Schema from the Schema Declarations
+// Builder builds a Schema from provided Declarations
 type Builder struct {
-	enums      []*Enum
-	inputs     []*Input
-	interfaces []*Interface
-	objects    []*Object
-	scalars    []*Scalar
-	unions     []*Union
-	errors     []error
+	schema            *Schema
+	declaredTypeNames map[string]interface{}
+	errors            []error
 }
 
 // NewBuilder returns a new Builder
 func NewBuilder() *Builder {
-	return &Builder{}
+	return &Builder{
+		schema:            newSchema(),
+		declaredTypeNames: make(map[string]interface{}),
+	}
 }
 
 func (builder *Builder) err(format string, s ...interface{}) {
@@ -164,133 +174,81 @@ func (builder *Builder) err(format string, s ...interface{}) {
 // Build builds and validates the Schema. If there are any errors a nil Schema
 // will be returned along with the list of validation errors
 func (builder *Builder) Build() (*Schema, []error) {
-	var schema Schema
-
-	// First, load all the Schema type maps with the declarations, and ensure
-	// each one has only been defined once. Since each declaration must have a
-	// name, any declaration without a name will be skipped and an error will be
-	// noted
-	schema.enums = make(map[string]*Enum, len(builder.enums))
-	for _, enum := range builder.enums {
-		if enum.Name == "" {
-			builder.err("Enum declared without a Name")
-			continue
-		}
-
-		if _, exists := schema.enums[enum.Name]; exists {
-			builder.err("Enum %s declared multiple times", enum.Name)
-			continue
-		}
-		schema.enums[enum.Name] = enum
-	}
-
-	schema.inputs = make(map[string]*Input, len(builder.inputs))
-	for _, input := range builder.inputs {
-		if builder.validateInputStructure(input) {
-			if _, exists := schema.inputs[input.Name]; exists {
-				builder.err("Input %s declared multiple times", input.Name)
-				continue
-			}
-			schema.inputs[input.Name] = input
-		}
-	}
-
-	schema.interfaces = make(map[string]*Interface, len(builder.interfaces))
-	for _, i := range builder.interfaces {
-		if i.Name == "" {
-			builder.err("Interface declared without a Name")
-			continue
-		}
-
-		if _, exists := schema.interfaces[i.Name]; exists {
-			builder.err("Interface %s declared multiple times", i.Name)
-			continue
-		}
-		schema.interfaces[i.Name] = i
-	}
-
-	schema.objects = make(map[string]*Object, len(builder.objects))
-	for _, object := range builder.objects {
-		if object.Name == "" {
-			builder.err("Object declared without a Name")
-			continue
-		}
-
-		if _, exists := schema.objects[object.Name]; exists {
-			builder.err("Object %s declared multiple times", object.Name)
-			continue
-		}
-		schema.objects[object.Name] = object
-	}
-
-	schema.scalars = make(map[string]*Scalar, len(builder.scalars))
-	for _, scalar := range builder.scalars {
-		if scalar.Name == "" {
-			builder.err("Scalar declared without a Name")
-			continue
-		}
-
-		if _, exists := schema.scalars[scalar.Name]; exists {
-			builder.err("Scalar %s declared multiple times", scalar.Name)
-			continue
-		}
-		schema.scalars[scalar.Name] = scalar
-	}
-
-	schema.unions = make(map[string]*Union, len(builder.unions))
-	for _, union := range builder.unions {
-		if union.Name == "" {
-			builder.err("Union declared without a Name")
-			continue
-		}
-
-		if _, exists := schema.unions[union.Name]; exists {
-			builder.err("Union %s declared multiple times", union.Name)
-			continue
-		}
-		schema.unions[union.Name] = union
-	}
-	// TODO a lot of copy paste above... can this be any better?
-
 	if len(builder.errors) > 0 {
 		return nil, builder.errors
 	}
-	return &schema, nil
+	return builder.schema, nil
 }
 
 // Enum adds a new Enum type declaration to the Schema
 func (builder *Builder) Enum(enum Enum) *Builder {
-	builder.enums = append(builder.enums, &enum)
+	if builder.validateEnumStructure(&enum) {
+		if builder.validateTypeIsUndeclared(enum.Name) {
+			builder.schema.enums[enum.Name] = &enum
+		} else {
+			builder.err("Cannot declare Enum %s because a Type with that Name already exists", enum.Name)
+		}
+	}
 	return builder
 }
 
 // Input adds a new Input type declaration to the Schema
 func (builder *Builder) Input(input Input) *Builder {
-	builder.inputs = append(builder.inputs, &input)
+	if builder.validateInputStructure(&input) {
+		if builder.validateTypeIsUndeclared(input.Name) {
+			builder.schema.inputs[input.Name] = &input
+		} else {
+			builder.err("Cannot declare Input %s because a Type with that Name already exists", input.Name)
+		}
+	}
 	return builder
 }
 
 // Interface adds a new Interface type declaration to the Schema
-func (builder *Builder) Interface(i Interface) *Builder {
-	builder.interfaces = append(builder.interfaces, &i)
+func (builder *Builder) Interface(intrface Interface) *Builder {
+	if builder.validateInterfaceStructure(&intrface) {
+		if builder.validateTypeIsUndeclared(intrface.Name) {
+			builder.schema.interfaces[intrface.Name] = &intrface
+		} else {
+			builder.err("Cannot declare Interface %s because a Type with that Name already exists", intrface.Name)
+		}
+	}
 	return builder
 }
 
 // Object adds a new Object type declaration to the Schema
 func (builder *Builder) Object(object Object) *Builder {
-	builder.objects = append(builder.objects, &object)
+	if builder.validateObjectStructure(&object) {
+		if builder.validateTypeIsUndeclared(object.Name) {
+			builder.schema.objects[object.Name] = &object
+		} else {
+			builder.err("Cannot declare Object %s because a Type with that Name already exists", object.Name)
+		}
+	}
 	return builder
 }
 
 // Scalar adds a new Scalar type declaration to the Schema
 func (builder *Builder) Scalar(scalar Scalar) *Builder {
-	builder.scalars = append(builder.scalars, &scalar)
+	if builder.validateScalarStructure(&scalar) {
+		if builder.validateTypeIsUndeclared(scalar.Name) {
+			builder.schema.scalars[scalar.Name] = &scalar
+		} else {
+			builder.err("Cannot declare Scalar %s because a Type with that Name already exists", scalar.Name)
+		}
+	}
 	return builder
 }
 
 // Union adds a new Union type declaration to the Schema
 func (builder *Builder) Union(union Union) *Builder {
-	builder.unions = append(builder.unions, &union)
+	if builder.validateUnionStructure(&union) {
+		if builder.validateTypeIsUndeclared(union.Name) {
+			builder.schema.unions[union.Name] = &union
+		} else {
+			builder.err("Cannot declare Union %s because a Type with that Name already exists", union.Name)
+		}
+	}
 	return builder
 }
 
@@ -317,15 +275,44 @@ func (builder *Builder) Declare(declaration Declaration) *Builder {
 	return builder
 }
 
-func (builder *Builder) validateInputStructure(input *Input) (valid bool) {
+func (builder *Builder) declareTypeWithName(name string) {
+	builder.declaredTypeNames[name] = struct{}{}
+}
+
+// Validate that a type with name is currently undeclared in the current Schema,
+// return false otherwise
+func (builder *Builder) validateTypeIsUndeclared(name string) (undefined bool) {
+	if _, exists := builder.declaredTypeNames[name]; exists {
+		return false
+	}
+	builder.declareTypeWithName(name)
+	return true
+}
+
+func (builder *Builder) validateEnumStructure(enum *Enum) bool {
+	if enum.Name == "" {
+		builder.err("Enum declared without a Name")
+		return false
+	}
+
+	if len(enum.Values) == 0 {
+		builder.err("Enum %s was declared without any values defined", enum.Name)
+		return false
+	}
+	return true
+}
+
+func (builder *Builder) validateInputStructure(input *Input) bool {
 	if input.Name == "" {
 		builder.err("Input declared without a Name")
-	} else if len(input.Fields) == 0 {
-		builder.err("Input %s was declared without any fields defined", input.Name)
-	} else {
-		valid = true
+		return false
 	}
-	return
+
+	if len(input.Fields) == 0 {
+		builder.err("Input %s was declared without any fields defined", input.Name)
+		return false
+	}
+	return true
 }
 
 func (builder *Builder) validateInputDeclaration(input *Input, schema *Schema) {
@@ -335,12 +322,38 @@ func (builder *Builder) validateInputDeclaration(input *Input, schema *Schema) {
 
 }
 
+func (builder *Builder) validateInterfaceStructure(intrface *Interface) bool {
+	if intrface.Name == "" {
+		builder.err("Interface declared without a Name")
+		return false
+	}
+
+	if len(intrface.Fields) == 0 {
+		builder.err("Interface %s was declared without any fields defined", intrface.Name)
+		return false
+	}
+	return true
+}
+
 // An Interface type must define one or more fields.
 // The fields of an Interface type must have unique names within that Interface type; no two fields may share the same name.
 func (builder *Builder) validateInterface(intrface *Interface, schema *Schema) {
 	if len(intrface.Fields) == 0 {
 		builder.err("Interface %s was declared without any fields defined", intrface.Name)
 	}
+}
+
+func (builder *Builder) validateObjectStructure(object *Object) bool {
+	if object.Name == "" {
+		builder.err("Object declared without a Name")
+		return false
+	}
+
+	if len(object.Fields) == 0 {
+		builder.err("Object %s was declared without any fields defined", object.Name)
+		return false
+	}
+	return true
 }
 
 // Object Validation Rules:
@@ -371,6 +384,18 @@ func (builder *Builder) validateObject(object *Object, schema *Schema) {
 	// }
 }
 
+func (builder *Builder) validateUnionStructure(union *Union) bool {
+	if union.Name == "" {
+		builder.err("Union declared without a Name")
+		return false
+	}
+
+	if len(union.Types) == 0 {
+		builder.err("Union %s delcared without any member Types", union.Name)
+	}
+	return true
+}
+
 //The member types of a Union type must all be Object base types; Scalar, Interface and Union types may not be member types of a Union. Similarly, wrapping types may not be member types of a Union.
 // A Union type must define one or more member types.
 func (builder *Builder) validateUnion(union *Union, schema *Schema) {
@@ -384,6 +409,14 @@ func (builder *Builder) validateUnion(union *Union, schema *Schema) {
 			builder.err("Union %s was declared with the member %s which is not an Object type", union.Name, member)
 		}
 	}
+}
+
+func (builder *Builder) validateScalarStructure(scalar *Scalar) bool {
+	if scalar.Name == "" {
+		builder.err("Scalar declared without a Name")
+		return false
+	}
+	return true
 }
 
 ///

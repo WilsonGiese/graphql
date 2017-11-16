@@ -239,7 +239,7 @@ func Test(t *testing.T) {
 
 	schema, errors := NewBuilder().
 		Declare(Scalar{
-			//Name:        "Time",
+			Name:        "Time",
 			Description: "Represents a datetime with an ISO8601 format",
 		}).
 		Declare(Enum{

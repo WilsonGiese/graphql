@@ -1,8 +1,15 @@
 package schema
 
+import "fmt"
+
 // Schema describes the structure and behavior of a GraphQL service
 type Schema struct {
-	enums map[string]Enum
+	enums      map[string]*Enum
+	inputs     map[string]*Input
+	interfaces map[string]*Interface
+	objects    map[string]*Object
+	scalars    map[string]*Scalar
+	unions     map[string]*Union
 }
 
 // Declaration represents a declared Type in the GraphQL Schema
@@ -55,6 +62,7 @@ func (enum Enum) TypeKind() TypeKind {
 type Input struct {
 	Name        string
 	Description string
+	Fields      map[string]Field
 }
 
 // TypeKind returns the TypeKind of Input
@@ -78,7 +86,7 @@ func (i Interface) TypeKind() TypeKind {
 type Union struct {
 	Name        string
 	Description string
-	Types       []Object
+	Types       []string
 }
 
 // TypeKind returns the TypeKind of Union
@@ -128,12 +136,12 @@ type Argument struct {
 
 // Builder builds a Schema from the Schema Declarations
 type Builder struct {
-	enums      []Enum
-	inputs     []Input
-	interfaces []Interface
-	objects    []Object
-	scalars    []Scalar
-	unions     []Union
+	enums      []*Enum
+	inputs     []*Input
+	interfaces []*Interface
+	objects    []*Object
+	scalars    []*Scalar
+	unions     []*Union
 	errors     []error
 }
 
@@ -142,67 +150,240 @@ func NewBuilder() *Builder {
 	return &Builder{}
 }
 
-// Build builds and validates the Schema
-func (sb *Builder) Build() (Schema, []error) {
-	return Schema{}, nil
+func (builder *Builder) err(format string, s ...interface{}) {
+	var err error
+
+	if len(s) == 0 {
+		err = fmt.Errorf("schema validation error: %s", format)
+	} else {
+		err = fmt.Errorf("schema validation error: %s", fmt.Sprintf(format, s))
+	}
+	builder.errors = append(builder.errors, err)
+}
+
+// Build builds and validates the Schema. If there are any errors a nil Schema
+// will be returned along with the list of validation errors
+func (builder *Builder) Build() (*Schema, []error) {
+	var schema Schema
+
+	// First, load all the Schema type maps with the declarations, and ensure
+	// each one has only been defined once. Since each declaration must have a
+	// name, any declaration without a name will be skipped and an error will be
+	// noted
+	schema.enums = make(map[string]*Enum, len(builder.enums))
+	for _, enum := range builder.enums {
+		if enum.Name == "" {
+			builder.err("Enum declared without a Name")
+			continue
+		}
+
+		if _, exists := schema.enums[enum.Name]; exists {
+			builder.err("Enum %s declared multiple times", enum.Name)
+			continue
+		}
+		schema.enums[enum.Name] = enum
+	}
+
+	schema.inputs = make(map[string]*Input, len(builder.inputs))
+	for _, input := range builder.inputs {
+		if builder.validateInputStructure(input) {
+			if _, exists := schema.inputs[input.Name]; exists {
+				builder.err("Input %s declared multiple times", input.Name)
+				continue
+			}
+			schema.inputs[input.Name] = input
+		}
+	}
+
+	schema.interfaces = make(map[string]*Interface, len(builder.interfaces))
+	for _, i := range builder.interfaces {
+		if i.Name == "" {
+			builder.err("Interface declared without a Name")
+			continue
+		}
+
+		if _, exists := schema.interfaces[i.Name]; exists {
+			builder.err("Interface %s declared multiple times", i.Name)
+			continue
+		}
+		schema.interfaces[i.Name] = i
+	}
+
+	schema.objects = make(map[string]*Object, len(builder.objects))
+	for _, object := range builder.objects {
+		if object.Name == "" {
+			builder.err("Object declared without a Name")
+			continue
+		}
+
+		if _, exists := schema.objects[object.Name]; exists {
+			builder.err("Object %s declared multiple times", object.Name)
+			continue
+		}
+		schema.objects[object.Name] = object
+	}
+
+	schema.scalars = make(map[string]*Scalar, len(builder.scalars))
+	for _, scalar := range builder.scalars {
+		if scalar.Name == "" {
+			builder.err("Scalar declared without a Name")
+			continue
+		}
+
+		if _, exists := schema.scalars[scalar.Name]; exists {
+			builder.err("Scalar %s declared multiple times", scalar.Name)
+			continue
+		}
+		schema.scalars[scalar.Name] = scalar
+	}
+
+	schema.unions = make(map[string]*Union, len(builder.unions))
+	for _, union := range builder.unions {
+		if union.Name == "" {
+			builder.err("Union declared without a Name")
+			continue
+		}
+
+		if _, exists := schema.unions[union.Name]; exists {
+			builder.err("Union %s declared multiple times", union.Name)
+			continue
+		}
+		schema.unions[union.Name] = union
+	}
+	// TODO a lot of copy paste above... can this be any better?
+
+	if len(builder.errors) > 0 {
+		return nil, builder.errors
+	}
+	return &schema, nil
 }
 
 // Enum adds a new Enum type declaration to the Schema
-func (sb *Builder) Enum(enum Enum) *Builder {
-	sb.enums = append(sb.enums, enum)
-	return sb
+func (builder *Builder) Enum(enum Enum) *Builder {
+	builder.enums = append(builder.enums, &enum)
+	return builder
 }
 
 // Input adds a new Input type declaration to the Schema
-func (sb *Builder) Input(input Input) *Builder {
-	sb.inputs = append(sb.inputs, input)
-	return sb
+func (builder *Builder) Input(input Input) *Builder {
+	builder.inputs = append(builder.inputs, &input)
+	return builder
 }
 
 // Interface adds a new Interface type declaration to the Schema
-func (sb *Builder) Interface(i Interface) *Builder {
-	sb.interfaces = append(sb.interfaces, i)
-	return sb
+func (builder *Builder) Interface(i Interface) *Builder {
+	builder.interfaces = append(builder.interfaces, &i)
+	return builder
 }
 
 // Object adds a new Object type declaration to the Schema
-func (sb *Builder) Object(object Object) *Builder {
-	sb.objects = append(sb.objects, object)
-	return sb
+func (builder *Builder) Object(object Object) *Builder {
+	builder.objects = append(builder.objects, &object)
+	return builder
 }
 
 // Scalar adds a new Scalar type declaration to the Schema
-func (sb *Builder) Scalar(scalar Scalar) *Builder {
-	sb.scalars = append(sb.scalars, scalar)
-	return sb
+func (builder *Builder) Scalar(scalar Scalar) *Builder {
+	builder.scalars = append(builder.scalars, &scalar)
+	return builder
 }
 
 // Union adds a new Union type declaration to the Schema
-func (sb *Builder) Union(union Union) *Builder {
-	sb.unions = append(sb.unions, union)
-	return sb
+func (builder *Builder) Union(union Union) *Builder {
+	builder.unions = append(builder.unions, &union)
+	return builder
 }
 
 // Declare a new schema type
-func (sb *Builder) Declare(declaration Declaration) *Builder {
+func (builder *Builder) Declare(declaration Declaration) *Builder {
 	switch v := declaration.(type) {
-	case *Enum:
-		sb.Enum(*v)
-	case *Input:
-		sb.Input(*v)
-	case *Interface:
-		sb.Interface(*v)
-	case *Object:
-		sb.Object(*v)
-	case *Scalar:
-		sb.Scalar(*v)
-	case *Union:
-		sb.Union(*v)
+	case Enum:
+		builder.Enum(v)
+	case Input:
+		builder.Input(v)
+	case Interface:
+		builder.Interface(v)
+	case Object:
+		builder.Object(v)
+	case Scalar:
+		builder.Scalar(v)
+	case Union:
+		builder.Union(v)
 	default:
-		panic("Include: Invalid schema delcaration") // TODO use Declaration instead of interface{}
+		// NOTE: unreachable only if type switch covers all Declaration types
+		panic("unreachable")
 	}
 
-	return sb
+	return builder
+}
+
+func (builder *Builder) validateInputStructure(input *Input) (valid bool) {
+	if input.Name == "" {
+		builder.err("Input declared without a Name")
+	} else if len(input.Fields) == 0 {
+		builder.err("Input %s was declared without any fields defined", input.Name)
+	} else {
+		valid = true
+	}
+	return
+}
+
+func (builder *Builder) validateInputDeclaration(input *Input, schema *Schema) {
+	if len(input.Fields) == 0 {
+		builder.err("Input %s was declared without any fields defined", input.Name)
+	}
+
+}
+
+// An Interface type must define one or more fields.
+// The fields of an Interface type must have unique names within that Interface type; no two fields may share the same name.
+func (builder *Builder) validateInterface(intrface *Interface, schema *Schema) {
+	if len(intrface.Fields) == 0 {
+		builder.err("Interface %s was declared without any fields defined", intrface.Name)
+	}
+}
+
+// Object Validation Rules:
+//
+// An Object type must define one or more fields.
+// The fields of an Object type must have unique names within that Object type; no two fields may share the same name.
+// An object type must be a super‐set of all interfaces it implements:
+// 		The object type must include a field of the same name for every field defined in an interface.
+// 				The object field must be of a type which is equal to or a sub‐type of the interface field (covariant).
+// 						An object field type is a valid sub‐type if it is equal to (the same type as) the interface field type.
+// 						An object field type is a valid sub‐type if it is an Object type and the interface field type is either an Interface type or a Union type and the object field type is a possible type of the interface field type.
+// 						An object field type is a valid sub‐type if it is a List type and the interface field type is also a List type and the list‐item type of the object field type is a valid sub‐type of the list‐item type of the interface field type.
+// 						An object field type is a valid sub‐type if it is a Non‐Null variant of a valid sub‐type of the interface field type.
+//				The object field must include an argument of the same name for every argument defined in the interface field.
+// 						The object field argument must accept the same type (invariant) as the interface field argument.
+// 				The object field may include additional arguments not defined in the interface field, but any additional argument must not be required.
+func (builder *Builder) validateObject(object *Object, schema *Schema) {
+	if len(object.Fields) == 0 {
+		builder.err("Object %s was declared without any fields defined", object.Name)
+	}
+
+	// for _, interfaceName := object.Implements {
+	// 	if intrface, exists := schema.interfaces[interfaceName]; exists {
+	//
+	// 	} else {
+	// 		builder.err("Object %s declared to implement unknown Interface %s", object.Name, interfaceName)
+	// 	}
+	// }
+}
+
+//The member types of a Union type must all be Object base types; Scalar, Interface and Union types may not be member types of a Union. Similarly, wrapping types may not be member types of a Union.
+// A Union type must define one or more member types.
+func (builder *Builder) validateUnion(union *Union, schema *Schema) {
+	if len(union.Types) == 0 {
+		builder.err("Union %s was declared without any member types defined")
+	}
+
+	// All member types must be Object types
+	for _, member := range union.Types {
+		if _, exists := schema.objects[member]; !exists {
+			builder.err("Union %s was declared with the member %s which is not an Object type", union.Name, member)
+		}
+	}
 }
 
 ///
@@ -220,19 +401,23 @@ func Objects(objects ...Object) []Object {
 }
 
 // Arguments builds a map from Argument names to the Argument itself
-func Arguments(arguments ...Argument) (argumentsMap map[string]Argument) {
+func Arguments(arguments ...Argument) map[string]Argument {
+	argumentsMap := make(map[string]Argument)
+
 	for _, argument := range arguments {
 		argumentsMap[argument.Name] = argument
 	}
-	return
+	return argumentsMap
 }
 
 // Fields builds a map from Field names to the Field itself
-func Fields(fields ...Field) (fieldsMap map[string]Field) {
+func Fields(fields ...Field) map[string]Field {
+	fieldsMap := make(map[string]Field)
+
 	for _, field := range fields {
 		fieldsMap[field.Name] = field
 	}
-	return
+	return fieldsMap
 }
 
 ///
@@ -300,411 +485,3 @@ var IDType = DescribeType("ID")
 
 // NonNullIDType is a TypeSchema for an ID which cannot be null
 var NonNullIDType = DescribeNonNullType("ID")
-
-///
-// Example Schema (Test) TODO remove
-///
-
-// enum DogCommand { SIT, DOWN, HEEL }
-var DogCommand = Enum{
-	Name:        "DogCommand",
-	Description: "Commands that a Dog may know",
-	Values:      []string{"SIT", "DOWN", "HEEL"},
-}
-
-// enum CatCommand { JUMP }
-var CatCommand = Enum{
-	Name:        "CatCommand",
-	Description: "Commands that a Cat may know",
-	Values:      []string{"JUMP"},
-}
-
-// interface Sentient {
-//   name: String!
-// }
-var Sentient = Interface{
-	Name: "Sentient",
-	Fields: Fields(
-		Field{
-			Name: "name",
-			Type: NonNullStringType,
-		},
-	),
-}
-
-// interface Pet {
-//   name: String!
-// }
-var Pet = Interface{
-	Name: "Pet",
-	Fields: Fields(
-		Field{
-			Name: "name",
-			Type: NonNullStringType,
-		},
-	),
-}
-
-// type Alien implements Sentient {
-//   name: String!
-//   homePlanet: String
-// }
-var Alien = Object{
-	Name:       "Alien",
-	Implements: Interfaces("Sentient"),
-	Fields: Fields(
-		Field{
-			Name:        "name",
-			Description: "Name of this Alien",
-			Type:        NonNullStringType,
-		},
-		Field{
-			Name:        "homePlanet",
-			Description: "The name of the planet where this Alien is from",
-			Type:        StringType,
-		},
-	),
-}
-
-// type Human implements Sentient {
-//   name: String!
-// }
-var Human = Object{
-	Name:       "Human",
-	Implements: Interfaces("Sentient"),
-	Fields: Fields(
-		Field{
-			Name:        "name",
-			Description: "Name of this Human",
-			Type:        NonNullStringType,
-		},
-	),
-}
-
-// type Dog implements Pet {
-//   name: String!
-//   nickname: String
-//   barkVolume: Int
-//   doesKnowCommand(dogCommand: DogCommand!): Boolean!
-//   isHousetrained(atOtherHomes: Boolean): Boolean!
-//   owner: Human
-// }
-var Dog = Object{
-	Name:        "Dog",
-	Implements:  Interfaces("Pet"),
-	Description: "Woof woof",
-	Fields: Fields(
-		Field{
-			Name:        "name",
-			Description: "Name of this Dog",
-			Type:        NonNullStringType,
-		},
-		Field{
-			Name:        "nickname",
-			Description: "Nickname of this Dog",
-			Type:        StringType,
-		},
-		Field{
-			Name:        "barkVolume",
-			Description: "How loud this Dog will bark",
-			Type:        IntType,
-		},
-		Field{
-			Name:        "doesKnowCommand",
-			Description: "Function to determine if this Dog knows a given DogCommand",
-			Type:        NonNullBooleanType,
-			Arguments: Arguments(
-				Argument{
-					Name: "dogCommand",
-					Type: DescribeNonNullType("DogCommand"),
-				},
-			),
-		},
-		Field{
-			Name:        "isHousetrained",
-			Description: "Function to determine if this Dog is house trained",
-			Type:        NonNullBooleanType,
-			Arguments: Arguments(
-				Argument{
-					Name: "atOtherHomes",
-					Type: BooleanType,
-				},
-			),
-		},
-		Field{
-			Name:        "owner",
-			Description: "Owner of this dog",
-			Type:        DescribeType("Human"),
-		},
-	),
-}
-
-// type Cat implements Pet {
-//   name: String!
-//   nickname: String
-//   doesKnowCommand(catCommand: CatCommand!): Boolean!
-//   meowVolume: Int
-// }
-var Cat = Object{
-	Name:       "Cat",
-	Implements: Interfaces("Pet"),
-	Fields: Fields(
-		Field{
-			Name:        "name",
-			Description: "Name of this Cat",
-			Type:        NonNullStringType,
-		},
-		Field{
-			Name:        "nickname",
-			Description: "Nickname of this Cat",
-			Type:        StringType,
-		},
-		Field{
-			Name:        "doesKnowCommand",
-			Description: "Function to determine if this Cat know a given CatCommand",
-			Type:        NonNullBooleanType,
-			Arguments: Arguments(
-				Argument{
-					Name: "catCommand",
-					Type: DescribeNonNullType("CatCommand"),
-				},
-			),
-		},
-		Field{
-			Name:        "meowVolume",
-			Description: "How loud this cat meows",
-			Type:        IntType,
-		},
-	),
-}
-
-// union CatOrDog = Cat | Dog
-var CatOrDog = Union{
-	Name:        "CatOrDog",
-	Description: "A type that can either be a Cat or Dog",
-	Types:       Objects(Cat, Dog),
-}
-
-// union DogOrHuman = Dog | Human
-var DogOrHuman = Union{
-	Name:        "DogOrHuman",
-	Description: "A type that can either be a Dog or Human",
-	Types:       Objects(Dog, Human),
-}
-
-// union HumanOrAlien = Human | Alien
-var HumanOrAlien = Union{
-	Name:        "HumanOrAlien",
-	Description: "A type that can either be a Human or Alien",
-	Types:       Objects(Human, Alien),
-}
-
-// type QueryRoot {
-//   dog: Dog
-// }
-var QueryRoot = Object{
-	Name:        "QueryRoot",
-	Description: "The query root object for this GraphQL Schema",
-	Fields: Fields(
-		Field{
-			Name: "dog",
-			Type: DescribeType("Dog"),
-		},
-	),
-}
-
-// Time ...
-var Time = Scalar{
-	Name:        "Time",
-	Description: "Represents a datetime with an ISO8601 format",
-}
-
-// The Schema's built in test are equivilent, but the first uses pre-declared
-// Declarations, and the second delcares them directly in the call to Declare
-func test() {
-	NewBuilder().
-		Scalar(Time).
-		Enum(DogCommand).
-		Enum(CatCommand).
-		Interface(Sentient).
-		Interface(Pet).
-		Object(Alien).
-		Object(Human).
-		Object(Dog).
-		Object(Cat).
-		Union(CatOrDog).
-		Union(DogOrHuman).
-		Union(HumanOrAlien).
-		Object(QueryRoot).Build()
-
-	NewBuilder().
-		Declare(Scalar{
-			Name:        "Time",
-			Description: "Represents a datetime with an ISO8601 format",
-		}).
-		Declare(Enum{
-			Name:        "DogCommand",
-			Description: "Commands that a Dog may know",
-			Values:      []string{"SIT", "DOWN", "HEEL"},
-		}).
-		Declare(Enum{
-			Name:        "CatCommand",
-			Description: "Commands that a Cat may know",
-			Values:      []string{"JUMP"},
-		}).
-		Declare(Interface{
-			Name:        "Sentient",
-			Description: "Sometimes does the thinky thinky",
-			Fields: Fields(
-				Field{
-					Name: "name",
-					Type: NonNullStringType,
-				},
-			),
-		}).
-		Declare(Interface{
-			Name: "Pet",
-			Fields: Fields(
-				Field{
-					Name: "name",
-					Type: NonNullStringType,
-				},
-			),
-		}).
-		Declare(Object{
-			Name:        "Alien",
-			Description: "Grey man",
-			Implements:  Interfaces("Sentient"),
-			Fields: Fields(
-				Field{
-					Name:        "name",
-					Description: "Name of this Alien",
-					Type:        NonNullStringType,
-				},
-				Field{
-					Name:        "homePlanet",
-					Description: "The name of the planet where this Alien is from",
-					Type:        StringType,
-				},
-			),
-		}).
-		Declare(Object{
-			Name:        "Human",
-			Description: "Pink man",
-			Implements:  Interfaces("Sentient"),
-			Fields: Fields(
-				Field{
-					Name:        "name",
-					Description: "Name of this Human",
-					Type:        NonNullStringType,
-				},
-			),
-		}).
-		Declare(Object{
-			Name:        "Dog",
-			Description: "Woof woof",
-			Implements:  Interfaces("Pet"),
-			Fields: Fields(
-				Field{
-					Name:        "name",
-					Description: "Name of this Dog",
-					Type:        NonNullStringType,
-				},
-				Field{
-					Name:        "nickname",
-					Description: "Nickname of this Dog",
-					Type:        StringType,
-				},
-				Field{
-					Name:        "barkVolume",
-					Description: "How loud this Dog will bark",
-					Type:        IntType,
-				},
-				Field{
-					Name:        "doesKnowCommand",
-					Description: "Function to determine if this Dog knows a given DogCommand",
-					Type:        NonNullBooleanType,
-					Arguments: Arguments(
-						Argument{
-							Name: "dogCommand",
-							Type: DescribeNonNullType("DogCommand"),
-						},
-					),
-				},
-				Field{
-					Name:        "isHousetrained",
-					Description: "Function to determine if this Dog is house trained",
-					Type:        NonNullBooleanType,
-					Arguments: Arguments(
-						Argument{
-							Name: "atOtherHomes",
-							Type: BooleanType,
-						},
-					),
-				},
-				Field{
-					Name:        "owner",
-					Description: "Owner of this dog",
-					Type:        DescribeType("Human"),
-				},
-			),
-		}).
-		Declare(Object{
-			Name:        "Cat",
-			Description: "Mew mew",
-			Implements:  Interfaces("Pet"),
-			Fields: Fields(
-				Field{
-					Name:        "name",
-					Description: "Name of this Cat",
-					Type:        NonNullStringType,
-				},
-				Field{
-					Name:        "nickname",
-					Description: "Nickname of this Cat",
-					Type:        StringType,
-				},
-				Field{
-					Name:        "doesKnowCommand",
-					Description: "Function to determine if this Cat know a given CatCommand",
-					Type:        NonNullBooleanType,
-					Arguments: Arguments(
-						Argument{
-							Name: "catCommand",
-							Type: DescribeNonNullType("CatCommand"),
-						},
-					),
-				},
-				Field{
-					Name:        "meowVolume",
-					Description: "How loud this cat meows",
-					Type:        IntType,
-				},
-			),
-		}).
-		Declare(Union{
-			Name:        "CatOrDog",
-			Description: "A type that can either be a Cat or Dog",
-			Types:       Objects(Cat, Dog),
-		}).
-		Declare(Union{
-			Name:        "DogOrHuman",
-			Description: "A type that can either be a Dog or Human",
-			Types:       Objects(Dog, Human),
-		}).
-		Declare(Union{
-			Name:        "HumanOrAlien",
-			Description: "A type that can either be a Human or Alien",
-			Types:       Objects(Human, Alien),
-		}).
-		Declare(Object{
-			Name:        "QueryRoot",
-			Description: "The query root object for this GraphQL Schema",
-			Fields: Fields(
-				Field{
-					Name: "dog",
-					Type: DescribeType("Dog"),
-				},
-			),
-		}).Build()
-}

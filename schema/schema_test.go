@@ -238,20 +238,39 @@ func Test(t *testing.T) {
 		Object(QueryRoot).Build()
 
 	schema, errors := NewBuilder().
-		Declare(Scalar{
-			Name:        "Time",
-			Description: "Represents a datetime with an ISO8601 format",
-		}).
+		// Declare(Scalar{
+		// 	Name:        "space ",
+		// 	Description: "Represents a datetime with an ISO8601 format",
+		// }).
+		// Declare(Input{
+		// 	Name: "NewDog",
+		// 	Fields: Fields(
+		// 		Field{
+		// 			Name: "Friends",
+		// 			Type: StringType,
+		// 			Arguments: Arguments(
+		// 				Argument{
+		// 					Name: "Arg1",
+		// 					Type: DescribeListType(Type{Name: "abc"}),
+		// 				},
+		// 			),
+		// 		},
+		// 		Field{
+		// 			Name: "BarkVolume",
+		// 			Type: IntType,
+		// 		},
+		// 	),
+		// }).
 		Declare(Enum{
 			Name:        "DogCommand",
 			Description: "Commands that a Dog may know",
 			Values:      []string{"SIT", "DOWN", "HEEL"},
 		}).
-		Declare(Enum{
-			Name:        "DogCommand",
-			Description: "Commands that a Dog may know",
-			Values:      []string{"SIT", "DOWN", "HEEL"},
-		}).
+		// Declare(Enum{
+		// 	Name:        "DogCommand",
+		// 	Description: "Commands that a Dog may know",
+		// 	Values:      []string{"SIT", "DOWN", "HEEL"},
+		// }).
 		Declare(Enum{
 			Name:        "CatCommand",
 			Description: "Commands that a Cat may know",
@@ -390,7 +409,7 @@ func Test(t *testing.T) {
 		Declare(Union{
 			Name:        "CatOrDog",
 			Description: "A type that can either be a Cat or Dog",
-			Types:       []string{"Cat", "Dog"},
+			//Types:       []string{"Cat", "Dog"},
 		}).
 		Declare(Union{
 			Name:        "DogOrHuman",

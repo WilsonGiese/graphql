@@ -2,27 +2,28 @@ package schema
 
 // Schema describes the structure and behavior of a GraphQL service
 type Schema struct {
-	enums      map[string]*Enum
-	inputs     map[string]*Input
-	interfaces map[string]*Interface
-	objects    map[string]*Object
-	scalars    map[string]*Scalar
-	unions     map[string]*Union
+	enums      map[string]Enum
+	inputs     map[string]Input
+	interfaces map[string]Interface
+	objects    map[string]Object
+	scalars    map[string]Scalar
+	unions     map[string]Union
 }
 
 func newSchema() *Schema {
 	return &Schema{
-		enums:      make(map[string]*Enum),
-		inputs:     make(map[string]*Input),
-		interfaces: make(map[string]*Interface),
-		objects:    make(map[string]*Object),
-		scalars:    make(map[string]*Scalar),
-		unions:     make(map[string]*Union),
+		enums:      make(map[string]Enum),
+		inputs:     make(map[string]Input),
+		interfaces: make(map[string]Interface),
+		objects:    make(map[string]Object),
+		scalars:    make(map[string]Scalar),
+		unions:     make(map[string]Union),
 	}
 }
 
 // Declaration represents a declared Type in the GraphQL Schema
 type Declaration interface {
+	name() string
 	typeKind() TypeKind
 }
 
@@ -50,6 +51,10 @@ type Scalar struct {
 	Description string
 }
 
+func (scalar Scalar) name() string {
+	return scalar.Name
+}
+
 // TypeKind returns the TypeKind of Scalar
 func (scalar Scalar) typeKind() TypeKind {
 	return SCALAR
@@ -60,6 +65,10 @@ type Enum struct {
 	Name        string
 	Values      []string
 	Description string
+}
+
+func (enum Enum) name() string {
+	return enum.Name
 }
 
 // TypeKind returns the TypeKind of Enum
@@ -74,6 +83,10 @@ type Input struct {
 	Fields      map[string]Field
 }
 
+func (input Input) name() string {
+	return input.Name
+}
+
 // TypeKind returns the TypeKind of Input
 func (input Input) typeKind() TypeKind {
 	return INPUT_OBJECT
@@ -84,6 +97,10 @@ type Interface struct {
 	Name        string
 	Description string
 	Fields      map[string]Field
+}
+
+func (intrface Interface) name() string {
+	return intrface.Name
 }
 
 // TypeKind returns the TypeKind of Interface
@@ -98,6 +115,10 @@ type Union struct {
 	Types       []string
 }
 
+func (union Union) name() string {
+	return union.Name
+}
+
 // TypeKind returns the TypeKind of Union
 func (union Union) typeKind() TypeKind {
 	return UNION
@@ -109,6 +130,10 @@ type Object struct {
 	Implements  []string
 	Description string
 	Fields      map[string]Field
+}
+
+func (object Object) name() string {
+	return object.Name
 }
 
 // TypeKind returns the TypeKind of Object
@@ -132,11 +157,55 @@ type Type struct {
 	SubType *Type
 }
 
+func (t *Type) String() string {
+	if t.List {
+		if t.NonNull {
+			return "[" + t.SubType.String() + "!]"
+		}
+		return "[" + t.SubType.String() + "]"
+	}
+	return t.Name
+}
+
 // Argument defines an argument for a Field defined within a Type
 type Argument struct {
 	Name    string
 	Type    Type
 	Default interface{}
+}
+
+// getDeclaration returns the Declaration for a Type. If the type is a list type
+// it will return the unwrapped type; e.g. [[String]] -> String
+func (schema *Schema) getDeclaration(t Type) Declaration {
+	if t.List {
+		return schema.getDeclaration(*t.SubType)
+	}
+
+	if scalar, exists := schema.scalars[t.Name]; exists {
+		return scalar
+	}
+
+	if enum, exists := schema.enums[t.Name]; exists {
+		return enum
+	}
+
+	if object, exists := schema.objects[t.Name]; exists {
+		return object
+	}
+
+	if intrface, exists := schema.interfaces[t.Name]; exists {
+		return intrface
+	}
+
+	if union, exists := schema.unions[t.Name]; exists {
+		return union
+	}
+
+	if input, exists := schema.inputs[t.Name]; exists {
+		return input
+	}
+
+	return nil
 }
 
 ///

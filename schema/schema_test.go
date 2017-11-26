@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -237,7 +236,7 @@ func Test(t *testing.T) {
 		Union(HumanOrAlien).
 		Object(QueryRoot).Build()
 
-	schema, errors := NewBuilder().
+	NewBuilder().
 		// Declare(Scalar{
 		// 	Name:        "space ",
 		// 	Description: "Represents a datetime with an ISO8601 format",
@@ -431,10 +430,4 @@ func Test(t *testing.T) {
 				},
 			),
 		}).Build()
-
-	if schema == nil {
-		fmt.Printf("%+v\n", errors)
-	} else {
-		fmt.Printf("%+v\n", schema)
-	}
 }

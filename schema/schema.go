@@ -157,12 +157,9 @@ type Type struct {
 	SubType *Type
 }
 
-func (t *Type) String() string {
+func (t Type) String() string {
 	if t.List {
-		if t.NonNull {
-			return "[" + t.SubType.String() + "!]"
-		}
-		return "[" + t.SubType.String() + "]"
+		return t.SubType.String()
 	}
 	return t.Name
 }

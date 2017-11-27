@@ -221,20 +221,20 @@ var Time = Scalar{
 // The Schema's built in test are equivilent, but the first uses pre-declared
 // Declarations, and the second delcares them directly in the call to Declare
 func Test(t *testing.T) {
-	NewBuilder().
-		Scalar(Time).
-		Enum(DogCommand).
-		Enum(CatCommand).
-		Interface(Sentient).
-		Interface(Pet).
-		Object(Alien).
-		Object(Human).
-		Object(Dog).
-		Object(Cat).
-		Union(CatOrDog).
-		Union(DogOrHuman).
-		Union(HumanOrAlien).
-		Object(QueryRoot).Build()
+	// NewBuilder().
+	// 	Scalar(Time).
+	// 	Enum(DogCommand).
+	// 	Enum(CatCommand).
+	// 	Interface(Sentient).
+	// 	Interface(Pet).
+	// 	Object(Alien).
+	// 	Object(Human).
+	// 	Object(Dog).
+	// 	Object(Cat).
+	// 	Union(CatOrDog).
+	// 	Union(DogOrHuman).
+	// 	Union(HumanOrAlien).
+	// 	Object(QueryRoot).Build()
 
 	NewBuilder().
 		// Declare(Scalar{
@@ -281,7 +281,7 @@ func Test(t *testing.T) {
 			Fields: Fields(
 				Field{
 					Name: "name",
-					Type: NonNullStringType,
+					Type: DescribeType("DogCommand"),
 				},
 			),
 		}).

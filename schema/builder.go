@@ -39,14 +39,24 @@ func (builder *Builder) err(format string, s ...interface{}) {
 // Build builds and validates the Schema. If there are any validation issues
 // Build will panic with a schema validation error describing the problem
 func (builder *Builder) Build() *Schema {
-
-	// Post declaration validation order
-	// Scalars
-	// Enums
-	// Interfaces
-	// Objects
-	// Unions
-	// Inputs
+	for _, scalar := range builder.schema.scalars {
+		builder.validateScalar(scalar)
+	}
+	for _, enum := range builder.schema.enums {
+		builder.validateEnum(enum)
+	}
+	for _, intrface := range builder.schema.interfaces {
+		builder.validateInterface(intrface)
+	}
+	for _, object := range builder.schema.objects {
+		builder.validateObject(object)
+	}
+	for _, union := range builder.schema.unions {
+		builder.validateUnion(union)
+	}
+	for _, input := range builder.schema.inputs {
+		builder.validateInput(input)
+	}
 	return builder.schema
 }
 
@@ -145,9 +155,20 @@ func (builder *Builder) declareTypeName(declaration Declaration) error {
 // Validation Functions - ensure schema declarations are valid
 ///
 
+// Interface 'Pet': Field 'name': declared with unknown Type 'String'
+
 func (builder *Builder) validateEnum(enum Enum) {
 	if len(enum.Values) == 0 {
 		builder.err("Enum %s: declaration must have at least one value defined", enum.Name)
+	}
+
+	// Check for value duplicates
+	enumValueSet := make(map[string]interface{})
+	for _, enumValue := range enum.Values {
+		if _, exists := enumValueSet[enumValue]; exists {
+			builder.err("Enum %s: declared value %s more than once", enum.Name, enumValue)
+		}
+		enumValueSet[enumValue] = struct{}{}
 	}
 }
 
@@ -158,10 +179,34 @@ func (builder *Builder) validateInput(input Input) {
 	}
 
 	for _, field := range input.Fields {
-		if err := builder.validateInputFieldStructure(&field); err != nil {
+		if err := builder.validateInputField(field); err != nil {
 			builder.err("Input %s(%s)", input.Name, err)
 		}
 	}
+}
+
+func (builder *Builder) validateInputField(field Field) error {
+	if err := builder.validateName(field.Name); err != nil {
+		return fmt.Errorf("Field: %s", err)
+	}
+
+	if err := builder.validateTypeStructure(field.Type); err != nil {
+		return fmt.Errorf("Field %s(%s)", field.Name, err)
+	}
+
+	declaration := builder.schema.getDeclaration(field.Type)
+	if declaration == nil {
+		return fmt.Errorf("Field %s: declared with unknown Type %s", field.Name, field.Type)
+	}
+	if declaration.typeKind() != INPUT_OBJECT {
+		return fmt.Errorf("Field %s: declared with non-Input Type %s", field.Name, field.Type)
+	}
+
+	// Input fields cannot be declared with arguments
+	if len(field.Arguments) > 0 {
+		return fmt.Errorf("Field %s: declared with arguments. Input fields must be declared without arguments", field.Name)
+	}
+	return nil
 }
 
 // http://facebook.github.io/graphql/October2016/#sec-Interface-type-validation
@@ -171,16 +216,48 @@ func (builder *Builder) validateInterface(intrface Interface) {
 	}
 
 	for _, field := range intrface.Fields {
-		if err := builder.validateFieldStructure(&field); err != nil {
+		if err := builder.validateField(field); err != nil {
 			builder.err("Interface %s(%s)", intrface.Name, err)
 		}
 	}
 }
 
+func (builder *Builder) validateField(field Field) error {
+	if err := builder.validateName(field.Name); err != nil {
+		return fmt.Errorf("Field: %s", err)
+	}
+
+	if err := builder.validateTypeStructure(field.Type); err != nil {
+		return fmt.Errorf("Field %s(%s)", field.Name, err)
+	}
+
+	declaration := builder.schema.getDeclaration(field.Type)
+	if declaration == nil {
+		return fmt.Errorf("Field %s: declared with unknown Type %s", field.Name, field.Type)
+	}
+	if declaration.typeKind() == INPUT_OBJECT {
+		return fmt.Errorf("Field %s: declared with Input Type %s", field.Name, field.Type)
+	}
+
+	for _, argument := range field.Arguments {
+		if err := builder.validateArgument(argument); err != nil {
+			return fmt.Errorf("Field %s(%s)", field.Name, err)
+		}
+	}
+	return nil
+}
+
 // http://facebook.github.io/graphql/October2016/#sec-Object-type-validation
 func (builder *Builder) validateObject(object Object) {
+
 	if len(object.Fields) == 0 {
 		builder.err("Object %s: declaration must have at least one Field defined", object.Name)
+	}
+
+	for _, field := range object.Fields {
+		if err := builder.validateField(field); err != nil {
+			builder.err("Object %s(%s)", object.Name, err)
+		}
 	}
 
 	for _, field := range object.Fields {
@@ -199,6 +276,18 @@ func (builder *Builder) validateUnion(union Union) {
 	if len(union.Types) == 0 {
 		builder.err("Union %s: declaration must have a least one member Type defined", union.Name)
 	}
+
+	// Check for value duplicates & invalid types
+	unionValueSet := make(map[string]interface{})
+	for _, unionTypeName := range union.Types {
+		if _, exists := unionValueSet[unionTypeName]; exists {
+			builder.err("Union %s: declared Type %s more than once", union.Name, unionTypeName)
+		}
+		if declaration := builder.schema.getDeclaration(DescribeType(unionTypeName)); declaration == nil {
+			builder.err("Union %s: declared with unknwon Type %s", union.Name, unionTypeName)
+		}
+		unionValueSet[unionTypeName] = struct{}{}
+	}
 }
 
 func (builder *Builder) validateName(name string) error {
@@ -212,59 +301,12 @@ func (builder *Builder) validateName(name string) error {
 	return nil
 }
 
-func (builder *Builder) validateInputFieldStructure(field *Field) error {
-	if err := builder.validateName(field.Name); err != nil {
-		return fmt.Errorf("Field: %s", err)
-	}
-
-	if err := builder.validateTypeStructure(&field.Type); err != nil {
-		return fmt.Errorf("Field %s(%s)", field.Name, err)
-	}
-
-	// Input fields cannot be declared with arguments
-	if len(field.Arguments) > 0 {
-		return fmt.Errorf("Field %s: declared with arguments. Input fields must be declared without arguments", field.Name)
-	}
-	return nil
-}
-
-func (builder *Builder) validateFieldStructure(field *Field) error {
-	if err := builder.validateName(field.Name); err != nil {
-		return fmt.Errorf("Field: %s", err)
-	}
-
-	if err := builder.validateTypeStructure(&field.Type); err != nil {
-		return fmt.Errorf("Field %s(%s)", field.Name, err)
-	}
-
-	if len(field.Arguments) > 0 {
-		for _, argument := range field.Arguments {
-			if err := builder.validateArgument(&argument); err != nil {
-				return fmt.Errorf("Field %s(%s)", field.Name, err)
-			}
-		}
-	}
-	return nil
-}
-
-func (builder *Builder) validateArgument(argument *Argument) error {
-	if err := builder.validateName(argument.Name); err != nil {
-		return fmt.Errorf("Argument: %s", err)
-	}
-
-	if err := builder.validateTypeStructure(&argument.Type); err != nil {
-		return fmt.Errorf("Argument %s(%s)", argument.Name, err)
-	}
-	return nil
-	// TODO validate default value?
-}
-
-func (builder *Builder) validateTypeStructure(t *Type) error {
+func (builder *Builder) validateTypeStructure(t Type) error {
 	if t.List {
 		if t.SubType == nil {
 			return fmt.Errorf("List Type: declared with nil SubType")
 		}
-		if err := builder.validateTypeStructure(t.SubType); err != nil {
+		if err := builder.validateTypeStructure(*t.SubType); err != nil {
 			return fmt.Errorf("List Type(%s)", err)
 		}
 	} else {
@@ -275,25 +317,48 @@ func (builder *Builder) validateTypeStructure(t *Type) error {
 	return nil
 }
 
-func (builder *Builder) validateFieldType(field Field) error {
-	declaration := builder.schema.getDeclaration(field.Type)
-	if declaration == nil {
-		return fmt.Errorf("Field %s: declared with invalid Type %s", field.Name, &field.Type)
+func (builder *Builder) validateFieldStructure(field *Field) error {
+	if err := builder.validateName(field.Name); err != nil {
+		return fmt.Errorf("Field: %s", err)
 	}
-	if declaration.typeKind() == INPUT_OBJECT {
-		return fmt.Errorf("Field %s: declared with Input Type %s", field.Name, &field.Type)
+
+	if err := builder.validateTypeStructure(field.Type); err != nil {
+		return fmt.Errorf("Field %s(%s)", field.Name, err)
+	}
+
+	if len(field.Arguments) > 0 {
+		for _, argument := range field.Arguments {
+			if err := builder.validateArgument(argument); err != nil {
+				return fmt.Errorf("Field %s(%s)", field.Name, err)
+			}
+		}
 	}
 	return nil
 }
 
-func (builder *Builder) validateInputFieldType(field *Field) error {
-	declaration := builder.schema.getDeclaration(field.Type)
+func (builder *Builder) validateArgument(argument Argument) error {
+	if err := builder.validateName(argument.Name); err != nil {
+		return fmt.Errorf("Argument: %s", err)
+	}
+
+	if err := builder.validateTypeStructure(argument.Type); err != nil {
+		return fmt.Errorf("Argument %s(%s)", argument.Name, err)
+	}
+
+	declaration := builder.schema.getDeclaration(argument.Type)
 	if declaration == nil {
-		return fmt.Errorf("Field %s: declared with invalid Type %s", field.Name, &field.Type)
+		return fmt.Errorf("Argument %s: declared with unknown Type %s", argument.Name, argument.Type)
 	}
 	if declaration.typeKind() == INPUT_OBJECT {
-		return fmt.Errorf("Field %s: declared with non-Input Type %s", field.Name, &field.Type)
+		return fmt.Errorf("Argument %s: declared with Input Type %s", argument.Name, argument.Type)
 	}
+
+	return nil
+	// TODO validate default value?
+}
+
+func (builder *Builder) validateFieldType(field Field) error {
+
 	return nil
 }
 

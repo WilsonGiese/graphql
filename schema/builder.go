@@ -162,13 +162,8 @@ func (builder *Builder) validateEnum(enum Enum) {
 		builder.err("Enum %s: declaration must have at least one value defined", enum.Name)
 	}
 
-	// Check for value duplicates
-	enumValueSet := make(map[string]interface{})
-	for _, enumValue := range enum.Values {
-		if _, exists := enumValueSet[enumValue]; exists {
-			builder.err("Enum %s: declared value %s more than once", enum.Name, enumValue)
-		}
-		enumValueSet[enumValue] = struct{}{}
+	if duplicate := findFirstDuplicate(enum.Values); duplicate != nil {
+		builder.err("Enum %s: declared duplicate value %s", enum.Name, *duplicate)
 	}
 }
 
@@ -190,15 +185,11 @@ func (builder *Builder) validateInputField(field Field) error {
 		return fmt.Errorf("Field: %s", err)
 	}
 
-	if err := builder.validateTypeStructure(field.Type); err != nil {
+	if err := builder.validateType(field.Type); err != nil {
 		return fmt.Errorf("Field %s(%s)", field.Name, err)
 	}
 
-	declaration := builder.schema.getDeclaration(field.Type)
-	if declaration == nil {
-		return fmt.Errorf("Field %s: declared with unknown Type %s", field.Name, field.Type)
-	}
-	if declaration.typeKind() != INPUT_OBJECT {
+	if builder.schema.getDeclaration(field.Type).typeKind() != INPUT_OBJECT {
 		return fmt.Errorf("Field %s: declared with non-Input Type %s", field.Name, field.Type)
 	}
 
@@ -222,31 +213,6 @@ func (builder *Builder) validateInterface(intrface Interface) {
 	}
 }
 
-func (builder *Builder) validateField(field Field) error {
-	if err := builder.validateName(field.Name); err != nil {
-		return fmt.Errorf("Field: %s", err)
-	}
-
-	if err := builder.validateTypeStructure(field.Type); err != nil {
-		return fmt.Errorf("Field %s(%s)", field.Name, err)
-	}
-
-	declaration := builder.schema.getDeclaration(field.Type)
-	if declaration == nil {
-		return fmt.Errorf("Field %s: declared with unknown Type %s", field.Name, field.Type)
-	}
-	if declaration.typeKind() == INPUT_OBJECT {
-		return fmt.Errorf("Field %s: declared with Input Type %s", field.Name, field.Type)
-	}
-
-	for _, argument := range field.Arguments {
-		if err := builder.validateArgument(argument); err != nil {
-			return fmt.Errorf("Field %s(%s)", field.Name, err)
-		}
-	}
-	return nil
-}
-
 // http://facebook.github.io/graphql/October2016/#sec-Object-type-validation
 func (builder *Builder) validateObject(object Object) {
 
@@ -256,12 +222,6 @@ func (builder *Builder) validateObject(object Object) {
 
 	for _, field := range object.Fields {
 		if err := builder.validateField(field); err != nil {
-			builder.err("Object %s(%s)", object.Name, err)
-		}
-	}
-
-	for _, field := range object.Fields {
-		if err := builder.validateFieldStructure(&field); err != nil {
 			builder.err("Object %s(%s)", object.Name, err)
 		}
 	}
@@ -277,17 +237,54 @@ func (builder *Builder) validateUnion(union Union) {
 		builder.err("Union %s: declaration must have a least one member Type defined", union.Name)
 	}
 
-	// Check for value duplicates & invalid types
-	unionValueSet := make(map[string]interface{})
 	for _, unionTypeName := range union.Types {
-		if _, exists := unionValueSet[unionTypeName]; exists {
-			builder.err("Union %s: declared Type %s more than once", union.Name, unionTypeName)
-		}
 		if declaration := builder.schema.getDeclaration(DescribeType(unionTypeName)); declaration == nil {
-			builder.err("Union %s: declared with unknwon Type %s", union.Name, unionTypeName)
+			builder.err("Union %s: declared with unknown Type %s", union.Name, unionTypeName)
+		} else if declaration.typeKind() != OBJECT {
+			builder.err("Union %s: declared with non-Object Type %s", union.Name, unionTypeName)
 		}
-		unionValueSet[unionTypeName] = struct{}{}
 	}
+
+	if duplicate := findFirstDuplicate(union.Types); duplicate != nil {
+		builder.err("Union %s: declared duplicate Type %s", union.Name, *duplicate)
+	}
+}
+
+func (builder *Builder) validateField(field Field) error {
+	if err := builder.validateName(field.Name); err != nil {
+		return fmt.Errorf("Field: %s", err)
+	}
+
+	if err := builder.validateType(field.Type); err != nil {
+		return fmt.Errorf("Field %s(%s)", field.Name, err)
+	}
+
+	if builder.schema.getDeclaration(field.Type).typeKind() == INPUT_OBJECT {
+		return fmt.Errorf("Field %s: declared with Input Type %s", field.Name, field.Type)
+	}
+
+	for _, argument := range field.Arguments {
+		if err := builder.validateArgument(argument); err != nil {
+			return fmt.Errorf("Field %s(%s)", field.Name, err)
+		}
+	}
+	return nil
+}
+
+func (builder *Builder) validateArgument(argument Argument) error {
+	if err := builder.validateName(argument.Name); err != nil {
+		return fmt.Errorf("Argument: %s", err)
+	}
+
+	if err := builder.validateType(argument.Type); err != nil {
+		return fmt.Errorf("Argument %s(%s)", argument.Name, err)
+	}
+
+	if builder.schema.getDeclaration(argument.Type).typeKind() == INPUT_OBJECT {
+		return fmt.Errorf("Argument %s: declared with Input Type %s", argument.Name, argument.Type)
+	}
+	return nil
+	// TODO validate default value?
 }
 
 func (builder *Builder) validateName(name string) error {
@@ -301,143 +298,53 @@ func (builder *Builder) validateName(name string) error {
 	return nil
 }
 
-func (builder *Builder) validateTypeStructure(t Type) error {
+func (builder *Builder) validateType(t Type) error {
 	if t.List {
 		if t.SubType == nil {
 			return fmt.Errorf("List Type: declared with nil SubType")
 		}
-		if err := builder.validateTypeStructure(*t.SubType); err != nil {
+		if err := builder.validateType(*t.SubType); err != nil {
 			return fmt.Errorf("List Type(%s)", err)
 		}
 	} else {
 		if err := builder.validateName(t.Name); err != nil {
 			return fmt.Errorf("Type: %s", err)
 		}
-	}
-	return nil
-}
-
-func (builder *Builder) validateFieldStructure(field *Field) error {
-	if err := builder.validateName(field.Name); err != nil {
-		return fmt.Errorf("Field: %s", err)
-	}
-
-	if err := builder.validateTypeStructure(field.Type); err != nil {
-		return fmt.Errorf("Field %s(%s)", field.Name, err)
-	}
-
-	if len(field.Arguments) > 0 {
-		for _, argument := range field.Arguments {
-			if err := builder.validateArgument(argument); err != nil {
-				return fmt.Errorf("Field %s(%s)", field.Name, err)
-			}
+		if declaration := builder.schema.getDeclaration(t); declaration == nil {
+			return fmt.Errorf("declared with unknown Type %s", t)
 		}
 	}
 	return nil
 }
 
-func (builder *Builder) validateArgument(argument Argument) error {
-	if err := builder.validateName(argument.Name); err != nil {
-		return fmt.Errorf("Argument: %s", err)
+func findFirstDuplicate(values []string) *string {
+	valueSet := make(map[string]interface{})
+	for _, value := range values {
+		if _, exists := valueSet[value]; exists {
+			return &value
+		}
+		valueSet[value] = struct{}{}
 	}
-
-	if err := builder.validateTypeStructure(argument.Type); err != nil {
-		return fmt.Errorf("Argument %s(%s)", argument.Name, err)
-	}
-
-	declaration := builder.schema.getDeclaration(argument.Type)
-	if declaration == nil {
-		return fmt.Errorf("Argument %s: declared with unknown Type %s", argument.Name, argument.Type)
-	}
-	if declaration.typeKind() == INPUT_OBJECT {
-		return fmt.Errorf("Argument %s: declared with Input Type %s", argument.Name, argument.Type)
-	}
-
-	return nil
-	// TODO validate default value?
-}
-
-func (builder *Builder) validateFieldType(field Field) error {
-
 	return nil
 }
-
-// Object Validation Rules:
-//
-// // An Object type must define one or more fields.
-// // The fields of an Object type must have unique names within that Object type; no two fields may share the same name.
-// An object type must be a super‐set of all interfaces it implements:
-// 		The object type must include a field of the same name for every field defined in an interface.
-// 				The object field must be of a type which is equal to or a sub‐type of the interface field (covariant).
-// 						An object field type is a valid sub‐type if it is equal to (the same type as) the interface field type.
-// 						An object field type is a valid sub‐type if it is an Object type and the interface field type is either an Interface type or a Union type and the object field type is a possible type of the interface field type.
-// 						An object field type is a valid sub‐type if it is a List type and the interface field type is also a List type and the list‐item type of the object field type is a valid sub‐type of the list‐item type of the interface field type.
-// 						An object field type is a valid sub‐type if it is a Non‐Null variant of a valid sub‐type of the interface field type.
-//				The object field must include an argument of the same name for every argument defined in the interface field.
-// 						The object field argument must accept the same type (invariant) as the interface field argument.
-// 				The object field may include additional arguments not defined in the interface field, but any additional argument must not be required.
-// func (builder *Builder) validateObject(object *Object, schema *Schema) {
-// 		// An object type must be a super‐set of all interfaces it implements:
-// 		for _, intrfaceName := range object.Implements {
-// 			if intrface, exists := builder.schema.interfaces[intrfaceName]; exists {
-// 				for _, intrfaceField := range intrface.Fields {
-// 					if objectField, exists := object.Fields[intrfaceField.Name]; exists {
-// 						// The object field must be of a type which is equal to or a sub‐type of the interface field (covariant).
-//
-// 					} else {
-// 						builder.err("Object %s: declaration must include Field %s from Interface %s", object.Name, intrfaceField.Name, intrfaceName)
-// 					}
-// 				}
-// 					//objectField :=
-// 		}
-// }
-
-func (builder *Builder) typeCheck(t1 *Type, t2 *Type) {
-
-}
-
-// An object field type is a valid sub‐type if it is equal to (the same type as) the interface field type.
-// An object field type is a valid sub‐type if it is an Object type and the interface field type is either an Interface type or a Union type and the object field type is a possible type of the interface field type.
-// An object field type is a valid sub‐type if it is a List type and the interface field type is also a List type and the list‐item type of the object field type is a valid sub‐type of the list‐item type of the interface field type.
-// An object field type is a valid sub‐type if it is a Non‐Null variant of a valid sub‐type of the interface field type.
-// func (builder *Builder) covariantTypeCheckFields(t1, t2 *Type) bool {
-//
-// 	if !reflect.DeepEqual(t1.Type, t2.Type) {
-//
-// 	}
-// }
-
-// for _, interfaceName := object.Implements {
-// 	if intrface, exists := schema.interfaces[interfaceName]; exists {
-//
-// 	} else {
-// 		builder.err("Object %s declared to implement unknown Interface %s", object.Name, interfaceName)
-// 	}
-// }
-//}
-
-//The member types of a Union type must all be Object base types; Scalar, Interface and Union types may not be member types of a Union. Similarly, wrapping types may not be member types of a Union.
-// A Union type must define one or more member types.
-// func (builder *Builder) validateUnion(union *Union, schema *Schema) {
-// 	if len(union.Types) == 0 {
-// 		builder.err("Union %s was declared without any member types defined")
-// 	}
-//
-// 	// All member types must be Object types
-// 	for _, member := range union.Types {
-// 		if _, exists := schema.objects[member]; !exists {
-// 			builder.err("Union %s was declared with the member %s which is not an Object type", union.Name, member)
-// 		}
-// 	}
-// }
 
 ///
 // Schema Builder Helpers (mostly for readability purposes)
 ///
 
-// Interfaces builds a list of Interfaces
+// Interfaces builds a list of Interface names
 func Interfaces(interfaces ...string) []string {
 	return interfaces
+}
+
+// Interfaces builds a list of string Values
+func Values(values ...string) []string {
+	return values
+}
+
+// Interfaces builds a list of Type names
+func Types(types ...string) []string {
+	return types
 }
 
 // Arguments builds a map from Argument names to the Argument itself

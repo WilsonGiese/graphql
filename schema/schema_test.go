@@ -263,7 +263,7 @@ func Test(t *testing.T) {
 		Declare(Enum{
 			Name:        "DogCommand",
 			Description: "Commands that a Dog may know",
-			Values:      []string{"SIT", "DOWN", "HEEL"},
+			Values:      Values("SIT", "SIT", "DOWN", "HEEL"),
 		}).
 		// Declare(Enum{
 		// 	Name:        "DogCommand",
@@ -273,7 +273,7 @@ func Test(t *testing.T) {
 		Declare(Enum{
 			Name:        "CatCommand",
 			Description: "Commands that a Cat may know",
-			Values:      []string{"JUMP"},
+			Values:      Values("JUMP"),
 		}).
 		Declare(Interface{
 			Name:        "Sentient",
@@ -413,12 +413,12 @@ func Test(t *testing.T) {
 		Declare(Union{
 			Name:        "DogOrHuman",
 			Description: "A type that can either be a Dog or Human",
-			Types:       []string{"Dog", "Human"},
+			Types:       Types("Dog", "Human"),
 		}).
 		Declare(Union{
 			Name:        "HumanOrAlien",
 			Description: "A type that can either be a Human or Alien",
-			Types:       []string{"Human", "Alien"},
+			Types:       Types("Human", "Alien"),
 		}).
 		Declare(Object{
 			Name:        "QueryRoot",

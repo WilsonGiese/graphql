@@ -18,11 +18,220 @@ type Builder struct {
 }
 
 // NewBuilder returns a new Builder
-func NewBuilder() *Builder {
-	return &Builder{
+
+func NewSchema() *Builder {
+	builder := Builder{
 		schema:            newSchema(),
 		declaredTypeNames: make(map[string]interface{}),
 	}
+
+	// Default Schema
+	builder.Declare(Object{
+		Name: "__Schema",
+		Fields: Fields(
+			Field{
+				Name:        "types",
+				Description: "All types that are a part of this Schema",
+				Type:        DescribeNonNullListType(DescribeNonNullType("__Type")),
+			},
+			Field{
+				Name:        "queryType",
+				Description: "Root query type for this Schema",
+				Type:        DescribeNonNullType("__Type"),
+			},
+			Field{
+				Name:        "mutationType",
+				Description: "Root mutation type for this Schema",
+				Type:        DescribeType("__Type"),
+			},
+			Field{
+				Name:        "directives",
+				Description: "All directives that are a part of this Schema",
+				Type:        DescribeNonNullListType(DescribeNonNullType("__Directive")),
+			},
+		),
+	}).Declare(Object{
+		Name: "__Type",
+		Fields: Fields(
+			Field{
+				Name: "kind",
+				Type: DescribeNonNullType("__TypeKind"),
+			},
+			Field{
+				Name: "name",
+				Type: NonNullStringType,
+			},
+			Field{
+				Name: "description",
+				Type: StringType,
+			},
+			Field{
+				Name: "fields",
+				Type: DescribeNonNullType("__Field"),
+				Arguments: Arguments(
+					Argument{
+						Name:    "includeDeprecated",
+						Type:    BooleanType,
+						Default: false,
+					},
+				),
+			},
+			Field{
+				Name: "interfaces",
+				Type: DescribeListType(DescribeNonNullType("__Type")),
+			},
+			Field{
+				Name: "possibleTypes",
+				Type: DescribeListType(DescribeNonNullType("__Type")),
+			},
+			Field{
+				Name: "enumValues",
+				Type: DescribeNonNullType("__EnumValue"),
+				Arguments: Arguments(
+					Argument{
+						Name:    "includeDeprecated",
+						Type:    BooleanType,
+						Default: false,
+					},
+				),
+			},
+			Field{
+				Name: "inputFields",
+				Type: DescribeListType(DescribeNonNullType("__InputValue")),
+			},
+			Field{
+				Name: "ofType",
+				Type: DescribeType("__Type"),
+			},
+		),
+	}).Declare(Object{
+		Name: "__Field",
+		Fields: Fields(
+			Field{
+				Name: "name",
+				Type: NonNullStringType,
+			},
+			Field{
+				Name: "description",
+				Type: StringType,
+			},
+			Field{
+				Name: "args",
+				Type: DescribeNonNullListType(DescribeNonNullType("__InputValue")),
+			},
+			Field{
+				Name: "type",
+				Type: DescribeNonNullType("__Type"),
+			},
+			Field{
+				Name: "isDeprecated",
+				Type: NonNullBooleanType,
+			},
+			Field{
+				Name: "deprecationReason",
+				Type: StringType,
+			},
+		),
+	}).Declare(Object{
+		Name: "__InputValue",
+		Fields: Fields(
+			Field{
+				Name: "name",
+				Type: NonNullStringType,
+			},
+			Field{
+				Name: "description",
+				Type: StringType,
+			},
+			Field{
+				Name: "type",
+				Type: DescribeNonNullType("__Type"),
+			},
+			Field{
+				Name: "defaultValue",
+				Type: StringType,
+			},
+		),
+	}).Declare(Object{
+		Name: "__EnumValue",
+		Fields: Fields(
+			Field{
+				Name: "name",
+				Type: NonNullStringType,
+			},
+			Field{
+				Name: "description",
+				Type: StringType,
+			},
+			Field{
+				Name: "isDeprecated",
+				Type: NonNullBooleanType,
+			},
+			Field{
+				Name: "deprecationReason",
+				Type: StringType,
+			},
+		),
+	}).Declare(Object{
+		Name: "__Directive",
+		Fields: Fields(
+			Field{
+				Name: "name",
+				Type: NonNullStringType,
+			},
+			Field{
+				Name: "description",
+				Type: StringType,
+			},
+			Field{
+				Name: "location",
+				Type: DescribeNonNullListType(DescribeNonNullType("__DirectiveLocation")),
+			},
+			Field{
+				Name: "args",
+				Type: DescribeNonNullListType(DescribeNonNullType("__InputValue")),
+			},
+		),
+	}).Declare(Enum{
+		Name: "__TypeKind",
+		Values: Values(
+			"SCALAR",
+			"OBJECT",
+			"INTERFACE",
+			"UNION",
+			"ENUM",
+			"INPUT_OBJECT",
+			"LIST",
+			"NON_NULL",
+		),
+	}).Declare(Enum{
+		Name: "__DirectiveLocation",
+		Values: Values(
+			"QUERY",
+			"MUTATION",
+			"FIELD",
+			"FRAGMENT_DEFINITION",
+			"FRAGMENT_SPREAD",
+			"INLINE_FRAGMENT",
+		),
+	}).Declare(Scalar{
+		Name:        "Int",
+		Description: "The Int scalar type represents a signed 32‐bit numeric non‐fractional value. Response formats that support a 32‐bit integer or a number type should use that type to represent this scalar.",
+	}).Declare(Scalar{
+		Name:        "Float",
+		Description: "The Float scalar type represents signed double‐precision fractional values as specified by IEEE 754. Response formats that support an appropriate double‐precision number type should use that type to represent this scalar.",
+	}).Declare(Scalar{
+		Name:        "String",
+		Description: "The String scalar type represents textual data, represented as UTF‐8 character sequences. The String type is most often used by GraphQL to represent free‐form human‐readable text. All response formats must support string representations, and that representation must be used here.",
+	}).Declare(Scalar{
+		Name:        "Boolean",
+		Description: "The Boolean scalar type represents true or false. Response formats should use a built‐in boolean type if supported; otherwise, they should use their representation of the integers 1 and 0.",
+	}).Declare(Scalar{
+		Name:        "ID",
+		Description: "The ID scalar type represents a unique identifier, often used to refetch an object or as the key for a cache. The ID type is serialized in the same way as a String; however, it is not intended to be human‐readable. While it is often numeric, it should always serialize as a String.",
+	})
+
+	return &builder
 }
 
 func (builder *Builder) err(format string, s ...interface{}) {
@@ -194,6 +403,7 @@ func (builder *Builder) validateInputField(field Field) error {
 	}
 
 	// Input fields cannot be declared with arguments
+	fmt.Println(len(field.Arguments))
 	if len(field.Arguments) > 0 {
 		return fmt.Errorf("Field %s: declared with arguments. Input fields must be declared without arguments", field.Name)
 	}

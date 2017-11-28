@@ -236,34 +236,34 @@ func Test(t *testing.T) {
 	// 	Union(HumanOrAlien).
 	// 	Object(QueryRoot).Build()
 
-	NewBuilder().
-		// Declare(Scalar{
-		// 	Name:        "space ",
-		// 	Description: "Represents a datetime with an ISO8601 format",
-		// }).
-		// Declare(Input{
-		// 	Name: "NewDog",
-		// 	Fields: Fields(
-		// 		Field{
-		// 			Name: "Friends",
-		// 			Type: StringType,
-		// 			Arguments: Arguments(
-		// 				Argument{
-		// 					Name: "Arg1",
-		// 					Type: DescribeListType(Type{Name: "abc"}),
-		// 				},
-		// 			),
-		// 		},
-		// 		Field{
-		// 			Name: "BarkVolume",
-		// 			Type: IntType,
-		// 		},
-		// 	),
-		// }).
+	NewSchema().
+		Declare(Scalar{
+			Name:        "space",
+			Description: "Represents a datetime with an ISO8601 format",
+		}).
+		Declare(Input{
+			Name: "NewDog",
+			Fields: Fields(
+				Field{
+					Name: "",
+					Type: StringType,
+					Arguments: Arguments(
+						Argument{
+							Name: "Arg1",
+							Type: DescribeListType(Type{Name: "abc"}),
+						},
+					),
+				},
+				Field{
+					Name: "BarkVolume",
+					Type: IntType,
+				},
+			),
+		}).
 		Declare(Enum{
 			Name:        "DogCommand",
 			Description: "Commands that a Dog may know",
-			Values:      Values("SIT", "SIT", "DOWN", "HEEL"),
+			Values:      Values("SIT", "DOWN", "HEEL"),
 		}).
 		// Declare(Enum{
 		// 	Name:        "DogCommand",

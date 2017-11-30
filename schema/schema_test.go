@@ -245,14 +245,8 @@ func Test(t *testing.T) {
 			Name: "NewDog",
 			Fields: Fields(
 				Field{
-					Name: "",
+					Name: "f1",
 					Type: StringType,
-					Arguments: Arguments(
-						Argument{
-							Name: "Arg1",
-							Type: DescribeListType(Type{Name: "abc"}),
-						},
-					),
 				},
 				Field{
 					Name: "BarkVolume",
@@ -281,7 +275,13 @@ func Test(t *testing.T) {
 			Fields: Fields(
 				Field{
 					Name: "name",
-					Type: DescribeType("DogCommand"),
+					Type: NonNullStringType,
+					Arguments: Arguments(
+						Argument{
+							Name: "language",
+							Type: StringType,
+						},
+					),
 				},
 			),
 		}).
@@ -303,6 +303,16 @@ func Test(t *testing.T) {
 					Name:        "name",
 					Description: "Name of this Alien",
 					Type:        NonNullStringType,
+					Arguments: Arguments(
+						Argument{
+							Name: "language",
+							Type: StringType,
+						},
+						Argument{
+							Name: "x",
+							Type: StringType,
+						},
+					),
 				},
 				Field{
 					Name:        "homePlanet",
@@ -320,6 +330,12 @@ func Test(t *testing.T) {
 					Name:        "name",
 					Description: "Name of this Human",
 					Type:        NonNullStringType,
+					Arguments: Arguments(
+						Argument{
+							Name: "language",
+							Type: StringType,
+						},
+					),
 				},
 			),
 		}).
@@ -408,7 +424,7 @@ func Test(t *testing.T) {
 		Declare(Union{
 			Name:        "CatOrDog",
 			Description: "A type that can either be a Cat or Dog",
-			//Types:       []string{"Cat", "Dog"},
+			Types:       Types("Cat", "Dog"),
 		}).
 		Declare(Union{
 			Name:        "DogOrHuman",

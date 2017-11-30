@@ -1,5 +1,10 @@
 package schema
 
+import (
+	"errors"
+	"fmt"
+)
+
 // Schema describes the structure and behavior of a GraphQL service
 type Schema struct {
 	enums      map[string]Enum
@@ -76,6 +81,10 @@ func (enum Enum) typeKind() TypeKind {
 	return ENUM
 }
 
+func (enum Enum) String() string {
+	return fmt.Sprintf("Enum(%s)", enum.Name)
+}
+
 // Input describes an input type object within a Schema
 type Input struct {
 	Name        string
@@ -90,6 +99,10 @@ func (input Input) name() string {
 // TypeKind returns the TypeKind of Input
 func (input Input) typeKind() TypeKind {
 	return INPUT_OBJECT
+}
+
+func (input Input) String() string {
+	return fmt.Sprintf("Input(%s)", input.Name)
 }
 
 // Interface describes an object type interface within a Schema
@@ -108,6 +121,10 @@ func (intrface Interface) typeKind() TypeKind {
 	return INTERFACE
 }
 
+func (intrface Interface) String() string {
+	return fmt.Sprintf("Interface(%s)", intrface.Name)
+}
+
 // Union describes a union of Types within a Schema
 type Union struct {
 	Name        string
@@ -122,6 +139,10 @@ func (union Union) name() string {
 // TypeKind returns the TypeKind of Union
 func (union Union) typeKind() TypeKind {
 	return UNION
+}
+
+func (union Union) String() string {
+	return fmt.Sprintf("Union(%s)", union.Name)
 }
 
 // Object describes an Object Type defined within a Schema
@@ -141,12 +162,20 @@ func (object Object) typeKind() TypeKind {
 	return OBJECT
 }
 
+func (object Object) String() string {
+	return fmt.Sprintf("Object(%s)", object.Name)
+}
+
 // Field describes a Field for a Type defined within a Schema
 type Field struct {
 	Name        string
 	Description string
 	Type        Type
 	Arguments   map[string]Argument
+}
+
+func (field Field) String() string {
+	return fmt.Sprintf("Field(%s)", field.Name)
 }
 
 // Type represents a Type in a Schema
@@ -159,7 +188,17 @@ type Type struct {
 
 func (t Type) String() string {
 	if t.List {
-		return t.SubType.String()
+		if t.SubType == nil {
+			return "[nil]"
+		}
+		if t.NonNull {
+			return fmt.Sprintf("[%s]!", t.SubType)
+		}
+		return fmt.Sprintf("[%s]", t.SubType)
+	}
+
+	if t.NonNull {
+		return t.Name + "!"
 	}
 	return t.Name
 }
@@ -169,6 +208,54 @@ type Argument struct {
 	Name    string
 	Type    Type
 	Default interface{}
+}
+
+func (argument Argument) String() string {
+	return fmt.Sprintf("Argument(%s)", argument.Name)
+}
+
+var errTypeNotFound = errors.New("type not found")
+
+func (schema *Schema) getEnum(name string) (Enum, error) {
+	if enum, exists := schema.enums[name]; exists {
+		return enum, nil
+	}
+	return Enum{}, errTypeNotFound
+}
+
+func (schema *Schema) getInput(name string) (Input, error) {
+	if input, exists := schema.inputs[name]; exists {
+		return input, nil
+	}
+	return Input{}, errTypeNotFound
+}
+
+func (schema *Schema) getInterface(name string) (Interface, error) {
+	if intrface, exists := schema.interfaces[name]; exists {
+		return intrface, nil
+	}
+	return Interface{}, errTypeNotFound
+}
+
+func (schema *Schema) getObject(name string) (Object, error) {
+	if object, exists := schema.objects[name]; exists {
+		return object, nil
+	}
+	return Object{}, errTypeNotFound
+}
+
+func (schema *Schema) getScalar(name string) (Scalar, error) {
+	if scalar, exists := schema.scalars[name]; exists {
+		return scalar, nil
+	}
+	return Scalar{}, errTypeNotFound
+}
+
+func (schema *Schema) getUnion(name string) (Union, error) {
+	if union, exists := schema.unions[name]; exists {
+		return union, nil
+	}
+	return Union{}, errTypeNotFound
 }
 
 // getDeclaration returns the Declaration for a Type. If the type is a list type

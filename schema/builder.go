@@ -245,9 +245,9 @@ func (builder *Builder) err(format string, s ...interface{}) {
 	var err error
 
 	if len(s) == 0 {
-		err = fmt.Errorf("schema validation error: %s", format)
+		err = NewSchemaValidationError(format)
 	} else {
-		err = fmt.Errorf("schema validation error: %s", fmt.Sprintf(format, s...))
+		err = NewSchemaValidationError(fmt.Sprintf(format, s...))
 	}
 	panic(err)
 }
@@ -361,7 +361,7 @@ func (builder *Builder) declareTypeName(declaration Declaration) error {
 	}
 
 	if _, exists := builder.declaredTypeNames[declaration.name()]; exists {
-		return fmt.Errorf("type with Name '%s' has already been declared", declaration.name())
+		return fmt.Errorf("declared with Name '%s' but another type with that name has already been declared", declaration.name())
 	}
 	builder.declaredTypeNames[declaration.name()] = struct{}{}
 	return nil
@@ -583,20 +583,21 @@ func (builder *Builder) validateName(name string) error {
 }
 
 func (builder *Builder) validateType(t Type) error {
-	if t.List {
+	// If t is a list type, pull out the underlying sub-type
+	actualType := t
+	for {
+		if !actualType.List {
+			break
+		}
+
 		if t.SubType == nil {
-			return fmt.Errorf("List Type: declared with nil SubType")
+			return fmt.Errorf("type %s has nil sub-type", t)
 		}
-		if err := builder.validateType(*t.SubType); err != nil {
-			return fmt.Errorf("List Type(%s)", err)
-		}
-	} else {
-		if err := builder.validateName(t.Name); err != nil {
-			return fmt.Errorf("Type: %s", err)
-		}
-		if declaration := builder.schema.getDeclaration(t); declaration == nil {
-			return fmt.Errorf("declared with unknown type %s", t)
-		}
+		actualType = *t.SubType
+	}
+
+	if declaration := builder.schema.getDeclaration(actualType); declaration == nil {
+		return fmt.Errorf("declared with unknown type '%s'", actualType.Name)
 	}
 	return nil
 }

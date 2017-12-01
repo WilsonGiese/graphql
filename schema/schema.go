@@ -192,9 +192,9 @@ func (t Type) String() string {
 			return "[nil]"
 		}
 		if t.NonNull {
-			return fmt.Sprintf("[%s]!", t.SubType)
+			return fmt.Sprintf("[%s]!", *t.SubType)
 		}
-		return fmt.Sprintf("[%s]", t.SubType)
+		return fmt.Sprintf("[%s]", *t.SubType)
 	}
 
 	if t.NonNull {
@@ -357,3 +357,21 @@ var IDType = DescribeType("ID")
 
 // NonNullIDType is a TypeSchema for an ID which cannot be null
 var NonNullIDType = DescribeNonNullType("ID")
+
+///
+// Schema errors
+///
+
+type SchemaValidationError struct {
+	message string
+}
+
+func NewSchemaValidationError(message string) SchemaValidationError {
+	return SchemaValidationError{
+		message: fmt.Sprintf("schema validation error: %s", message),
+	}
+}
+
+func (err SchemaValidationError) Error() string {
+	return err.message
+}

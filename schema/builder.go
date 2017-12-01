@@ -6,13 +6,6 @@ import (
 	"regexp"
 )
 
-// NOTE: More structured errors
-// Maybe something like... schema validation error: Object(Alien) Field(name) declared with Type(String!) but Interface(Sentient) requires Type(Boolean!) or a valid sub-type
-// Structure: [Offending Type.Field.Argument,etc] declared with... [Declaration issue (what was wrong)] but... [Issue suggestion (what it should be)]
-//
-// Other examples:
-// schema validation error: Object(Alien) Field(name) declared without Argument(language) required by Interface(Sentient) [recovered]
-
 var validNameMatcher *regexp.Regexp
 
 func init() {
@@ -245,9 +238,9 @@ func (builder *Builder) err(format string, s ...interface{}) {
 	var err error
 
 	if len(s) == 0 {
-		err = NewSchemaValidationError(format)
+		err = NewValidationError(format)
 	} else {
-		err = NewSchemaValidationError(fmt.Sprintf(format, s...))
+		err = NewValidationError(fmt.Sprintf(format, s...))
 	}
 	panic(err)
 }
@@ -361,7 +354,7 @@ func (builder *Builder) declareTypeName(declaration Declaration) error {
 	}
 
 	if _, exists := builder.declaredTypeNames[declaration.name()]; exists {
-		return fmt.Errorf("declared with Name '%s' but another type with that name has already been declared", declaration.name())
+		return fmt.Errorf("declared with name '%s' but another type with that name has already been declared", declaration.name())
 	}
 	builder.declaredTypeNames[declaration.name()] = struct{}{}
 	return nil
@@ -476,14 +469,14 @@ func (builder *Builder) validateUnion(union Union) {
 
 	for _, unionTypeName := range union.Types {
 		if declaration := builder.schema.getDeclaration(DescribeType(unionTypeName)); declaration == nil {
-			builder.err("%s declared with unknown type %s", union.Name, unionTypeName)
+			builder.err("%s declared with unknown type %s", union, unionTypeName)
 		} else if declaration.typeKind() != OBJECT {
 			builder.err("%s declared with member type %s. Union members must be Objects", union, unionTypeName)
 		}
 	}
 
 	if duplicate := findFirstDuplicate(union.Types); duplicate != nil {
-		builder.err("%s declared duplicate type %s", union.Name, *duplicate)
+		builder.err("%s declared duplicate type %s", union, *duplicate)
 	}
 }
 
@@ -616,6 +609,10 @@ func (builder *Builder) covariantTypeCheck(t1, t2 Type) bool {
 	// An object field type is a valid sub‐type if it is equal to (the same type as) the interface field type
 	if typeCheck(t1, t2) {
 		return true
+	}
+
+	if t1.NonNull != t2.NonNull {
+		return false
 	}
 
 	// An object field type is a valid sub‐type if it is a List type and the interface field type is also a List type and the list‐item type of the object field type is a valid sub‐type of the list‐item type of the interface field type.

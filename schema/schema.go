@@ -362,16 +362,20 @@ var NonNullIDType = DescribeNonNullType("ID")
 // Schema errors
 ///
 
-type SchemaValidationError struct {
+// ValidationError represents an error that occured during the declaration
+// or build phase of a Schema. The error includes a message describing the issue
+// encountered
+type ValidationError struct {
 	message string
 }
 
-func NewSchemaValidationError(message string) SchemaValidationError {
-	return SchemaValidationError{
+// NewValidationError returns a new SchemaValidationError
+func NewValidationError(message string) ValidationError {
+	return ValidationError{
 		message: fmt.Sprintf("schema validation error: %s", message),
 	}
 }
 
-func (err SchemaValidationError) Error() string {
+func (err ValidationError) Error() string {
 	return err.message
 }

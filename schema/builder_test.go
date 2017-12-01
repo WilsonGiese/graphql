@@ -4,13 +4,46 @@ import (
 	"testing"
 )
 
+var TestEnum = Enum{
+	Name:   "TestEnum",
+	Values: Values("TEST_A", "TEST_B", "TEST_C"),
+}
+
+var TestInput = Input{
+	Name: "TestInput",
+	Fields: Fields(Field{
+		Name: "TestField",
+		Type: IntType,
+	}),
+}
+
+var TestInterface = Interface{
+	Name: "TestInterface",
+	Fields: Fields(Field{
+		Name: "TestInterfaceField",
+		Type: BooleanType,
+	}),
+}
+
+var TestObject = Object{
+	Name: "TestObject",
+	Fields: Fields(Field{
+		Name: "TestField",
+		Type: StringType,
+	}),
+}
+
+var TestScalar = Scalar{
+	Name: "TestScalar",
+}
+
 // Tests if default Schema can be built successfully, should panic otherwise
 func TestBuildDefaultSchema(t *testing.T) {
 	NewSchema().Build()
 }
 
 func TestInvalidSchemaMultipleDeclarationsWithTheSameName(t *testing.T) {
-	expected := NewSchemaValidationError("Object declared with Name 'Duplicate' but another type with that name has already been declared")
+	expected := NewValidationError("Object declared with name 'Duplicate' but another type with that name has already been declared")
 
 	actual := CapturePanic(func() {
 		NewSchema().
@@ -35,7 +68,7 @@ func TestInvalidSchemaMultipleDeclarationsWithTheSameName(t *testing.T) {
 ///
 
 func TestInvalidEnumNameUndeclared(t *testing.T) {
-	expected := NewSchemaValidationError("Enum declared without Name defined")
+	expected := NewValidationError("Enum declared without Name defined")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Enum{}).Build()
@@ -44,7 +77,7 @@ func TestInvalidEnumNameUndeclared(t *testing.T) {
 }
 
 func TestInvalidEnumNameCharacters(t *testing.T) {
-	expected := NewSchemaValidationError("Enum declared with an invalid Name 'Some Enum With Spaces'. A Name must only consist of ASCII letters, numbers, and underscores")
+	expected := NewValidationError("Enum declared with an invalid Name 'Some Enum With Spaces'. A Name must only consist of ASCII letters, numbers, and underscores")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Enum{
@@ -55,7 +88,7 @@ func TestInvalidEnumNameCharacters(t *testing.T) {
 }
 
 func TestInvalidEnumWithoutValues(t *testing.T) {
-	expected := NewSchemaValidationError("Enum(Test) delcared without any values defined")
+	expected := NewValidationError("Enum(Test) delcared without any values defined")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Enum{
@@ -66,7 +99,7 @@ func TestInvalidEnumWithoutValues(t *testing.T) {
 }
 
 func TestInvalidEnumWithDuplicateValues(t *testing.T) {
-	expected := NewSchemaValidationError("Enum(Test) declared duplicate value TEST_B")
+	expected := NewValidationError("Enum(Test) declared duplicate value TEST_B")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Enum{
@@ -82,7 +115,7 @@ func TestInvalidEnumWithDuplicateValues(t *testing.T) {
 ///
 
 func TestInvalidInputNameUndeclared(t *testing.T) {
-	expected := NewSchemaValidationError("Input declared without Name defined")
+	expected := NewValidationError("Input declared without Name defined")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Input{}).Build()
@@ -91,7 +124,7 @@ func TestInvalidInputNameUndeclared(t *testing.T) {
 }
 
 func TestInvalidInputNameCharacters(t *testing.T) {
-	expected := NewSchemaValidationError("Input declared with an invalid Name 'InputName!'. A Name must only consist of ASCII letters, numbers, and underscores")
+	expected := NewValidationError("Input declared with an invalid Name 'InputName!'. A Name must only consist of ASCII letters, numbers, and underscores")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Input{
@@ -102,7 +135,7 @@ func TestInvalidInputNameCharacters(t *testing.T) {
 }
 
 func TestInvalidInputWithoutFields(t *testing.T) {
-	expected := NewSchemaValidationError("Input(Test) declared without any Fields defined")
+	expected := NewValidationError("Input(Test) declared without any Fields defined")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Input{
@@ -117,7 +150,7 @@ func TestInvalidInputWithoutFields(t *testing.T) {
 ///
 
 func TestInvalidInterfaceNameUndeclared(t *testing.T) {
-	expected := NewSchemaValidationError("Interface declared without Name defined")
+	expected := NewValidationError("Interface declared without Name defined")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Interface{}).Build()
@@ -126,11 +159,22 @@ func TestInvalidInterfaceNameUndeclared(t *testing.T) {
 }
 
 func TestInvalidInterfaceNameCharacters(t *testing.T) {
-	expected := NewSchemaValidationError("Interface declared with an invalid Name 'Interface%'. A Name must only consist of ASCII letters, numbers, and underscores")
+	expected := NewValidationError("Interface declared with an invalid Name 'Interface%'. A Name must only consist of ASCII letters, numbers, and underscores")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Interface{
 			Name: "Interface%",
+		}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInterfaceWithoutFields(t *testing.T) {
+	expected := NewValidationError("Interface(Test) declared without any Fields defined")
+
+	actual := CapturePanic(func() {
+		NewSchema().Declare(Interface{
+			Name: "Test",
 		}).Build()
 	})
 	AssertSchemaValidationError(expected, actual, t)
@@ -141,7 +185,7 @@ func TestInvalidInterfaceNameCharacters(t *testing.T) {
 ///
 
 func TestInvalidObjectNameUndeclared(t *testing.T) {
-	expected := NewSchemaValidationError("Object declared without Name defined")
+	expected := NewValidationError("Object declared without Name defined")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Object{}).Build()
@@ -150,11 +194,22 @@ func TestInvalidObjectNameUndeclared(t *testing.T) {
 }
 
 func TestInvalidObjectNameCharacters(t *testing.T) {
-	expected := NewSchemaValidationError("Object declared with an invalid Name 'Object$'. A Name must only consist of ASCII letters, numbers, and underscores")
+	expected := NewValidationError("Object declared with an invalid Name 'Object$'. A Name must only consist of ASCII letters, numbers, and underscores")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Object{
 			Name: "Object$",
+		}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectWithoutFields(t *testing.T) {
+	expected := NewValidationError("Object(Test) declared without any Fields defined")
+
+	actual := CapturePanic(func() {
+		NewSchema().Declare(Object{
+			Name: "Test",
 		}).Build()
 	})
 	AssertSchemaValidationError(expected, actual, t)
@@ -165,7 +220,7 @@ func TestInvalidObjectNameCharacters(t *testing.T) {
 ///
 
 func TestInvalidScalarNameUndeclared(t *testing.T) {
-	expected := NewSchemaValidationError("Scalar declared without Name defined")
+	expected := NewValidationError("Scalar declared without Name defined")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Scalar{}).Build()
@@ -174,7 +229,7 @@ func TestInvalidScalarNameUndeclared(t *testing.T) {
 }
 
 func TestInvalidScalarNameCharacters(t *testing.T) {
-	expected := NewSchemaValidationError("Scalar declared with an invalid Name 'Scalar&'. A Name must only consist of ASCII letters, numbers, and underscores")
+	expected := NewValidationError("Scalar declared with an invalid Name 'Scalar&'. A Name must only consist of ASCII letters, numbers, and underscores")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Scalar{
@@ -189,7 +244,7 @@ func TestInvalidScalarNameCharacters(t *testing.T) {
 ///
 
 func TestInvalidUnionNameUndeclared(t *testing.T) {
-	expected := NewSchemaValidationError("Union declared without Name defined")
+	expected := NewValidationError("Union declared without Name defined")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Union{}).Build()
@@ -198,12 +253,69 @@ func TestInvalidUnionNameUndeclared(t *testing.T) {
 }
 
 func TestInvalidUnionNameCharacters(t *testing.T) {
-	expected := NewSchemaValidationError("Union declared with an invalid Name 'Union()'. A Name must only consist of ASCII letters, numbers, and underscores")
+	expected := NewValidationError("Union declared with an invalid Name 'Union()'. A Name must only consist of ASCII letters, numbers, and underscores")
 
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Union{
 			Name: "Union()",
 		}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidUnionWithoutMembers(t *testing.T) {
+	expected := NewValidationError("Union(Test) declared without any member types defined")
+
+	actual := CapturePanic(func() {
+		NewSchema().Declare(Union{
+			Name: "Test",
+		}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidUnionWithDuplicateMembers(t *testing.T) {
+	expected := NewValidationError("Union(Test) declared duplicate type TestObject")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Union{
+				Name:  "Test",
+				Types: Types("TestObject", "TestObject"),
+			}).
+			Declare(TestObject).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidUnionMemberTypeDoesNotExist(t *testing.T) {
+	expected := NewValidationError("Union(TestUnion) declared with unknown type TestUnknownObject")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Union{
+				Name:  "TestUnion",
+				Types: Types("TestObject", "TestUnknownObject"),
+			}).
+			Declare(TestObject).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidUnionMemberNonObjectMemberType(t *testing.T) {
+	expected := NewValidationError("Union(TestUnion) declared with member type TestEnum. Union members must be Objects")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Union{
+				Name:  "TestUnion",
+				Types: Types("TestEnum", "TestInput", "TestInterface", "TestScalar", "TestObject"),
+			}).
+			Declare(TestEnum).
+			Declare(TestInput).
+			Declare(TestInterface).
+			Declare(TestObject).
+			Declare(TestScalar).Build()
 	})
 	AssertSchemaValidationError(expected, actual, t)
 }
@@ -223,10 +335,10 @@ func CapturePanic(f func()) (err error) {
 
 func AssertSchemaValidationError(expected error, actual error, t *testing.T) {
 	if actual == nil {
-		t.Errorf("Expected error '%s' but error was nil", expected)
+		t.Errorf("expected '%s' but error was nil", expected)
 	} else {
 		if actual.Error() != expected.Error() {
-			t.Errorf("Expected error '%s' but got '%s'", expected, actual)
+			t.Errorf("expected '%s' but got '%s'", expected, actual)
 		}
 	}
 }

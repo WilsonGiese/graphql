@@ -37,6 +37,11 @@ var TestScalar = Scalar{
 	Name: "TestScalar",
 }
 
+var TestUnion = Union{
+	Name:  "TestUnion",
+	Types: Types("TestObject"),
+}
+
 // Tests if default Schema can be built successfully, should panic otherwise
 func TestBuildDefaultSchema(t *testing.T) {
 	NewSchema().Build()
@@ -141,6 +146,103 @@ func TestInvalidInputWithoutFields(t *testing.T) {
 		NewSchema().Declare(Input{
 			Name: "Test",
 		}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInputFieldName(t *testing.T) {
+	expected := NewValidationError("Input(Test) Field declared with an invalid Name 'InvalidFieldName!'. A Name must only consist of ASCII letters, numbers, and underscores")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Input{
+				Name: "Test",
+				Fields: Fields(Field{
+					Name: "InvalidFieldName!",
+				}),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInputUnknownFieldType(t *testing.T) {
+	expected := NewValidationError("Input(Test) Field(TestField) declared with unknown type 'FooBar'")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Input{
+				Name: "Test",
+				Fields: Fields(Field{
+					Name: "TestField",
+					Type: DescribeType("FooBar"),
+				}),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInputUnacceptableFieldType(t *testing.T) {
+	expected := NewValidationError("Input(Test) Field(TestInterfaceField) declared with invalid Type 'TestInterface'. An Input Field type must be Input, Scalar, or Enum")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(TestEnum).
+			Declare(TestInput).
+			Declare(TestInterface).
+			Declare(TestObject).
+			Declare(TestScalar).
+			Declare(TestUnion).
+			Declare(Input{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestInputField",
+						Type: DescribeType("TestInput"),
+					},
+					Field{
+						Name: "TestEnumField",
+						Type: DescribeType("TestEnum"),
+					},
+					Field{
+						Name: "TestScalarField",
+						Type: StringType,
+					},
+					Field{
+						Name: "TestInterfaceField",
+						Type: DescribeType("TestInterface"),
+					},
+					Field{
+						Name: "TestObjectField",
+						Type: DescribeType("TestObject"),
+					},
+					Field{
+						Name: "TestUnionField",
+						Type: DescribeType("TestUnion"),
+					},
+				),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInputFieldWithArguments(t *testing.T) {
+	expected := NewValidationError("Input(Test) Field(TestField) declared with arguments. Input fields must be declared without arguments")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Input{
+				Name: "Test",
+				Fields: Fields(Field{
+					Name: "TestField",
+					Type: BooleanType,
+					Arguments: Arguments(
+						Argument{
+							Name: "TestArgument",
+							Type: FloatType,
+						},
+					),
+				}),
+			}).Build()
 	})
 	AssertSchemaValidationError(expected, actual, t)
 }

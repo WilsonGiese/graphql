@@ -491,7 +491,7 @@ func (builder *Builder) validateField(field Field) error {
 	}
 
 	if builder.schema.getDeclaration(field.Type).typeKind() == INPUT_OBJECT {
-		return fmt.Errorf("%s declared with Input type %s", field, field.Type)
+		return fmt.Errorf("%s declared with Input type '%s'", field, field.Type)
 	}
 
 	for _, argument := range field.Arguments {
@@ -517,6 +517,7 @@ func (builder *Builder) validateFieldImplementsInterface(objectField, interfaceF
 		}
 
 		// Validate all aditional Field Arguments are not required
+		// TODO this is wrong, idiot! If THIS interface doesn't require this field, ANOTHER might.
 		for _, objectArgument := range objectField.Arguments {
 			if _, exists := interfaceField.Arguments[objectArgument.Name]; !exists {
 				if objectArgument.Type.NonNull {
@@ -560,6 +561,10 @@ func (builder *Builder) validateArgument(argument Argument) error {
 	default:
 		return fmt.Errorf("%s declared with invalid type '%s'. An Argument Type must be Input, Scalar, or Enum", argument, argument.Type)
 	}
+
+	if argument.Type.NonNull && argument.Default != nil {
+		return fmt.Errorf("%s declared with a default value, but its type is non-null", argument)
+	}
 	return nil
 	// TODO validate default value?
 }
@@ -576,7 +581,7 @@ func (builder *Builder) validateName(name string) error {
 }
 
 func (builder *Builder) validateType(t Type) error {
-	// If t is a list type, pull out the underlying sub-type
+	// If t is a list type, pull out the underlying base type
 	actualType := t
 	for {
 		if !actualType.List {

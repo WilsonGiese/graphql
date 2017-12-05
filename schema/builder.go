@@ -448,11 +448,11 @@ func (builder *Builder) validateObject(object Object) {
 						builder.err("%s %s", object, err)
 					}
 				} else {
-					builder.err("%s declared without Field %s required by %s", object, interfaceField, intrface)
+					builder.err("%s declared without %s required by %s", object, interfaceField, intrface)
 				}
 			}
 		} else {
-			builder.err("%s declared implementing unknown Interface %s", object, interfaceName)
+			builder.err("%s declared implementing unknown Interface '%s'", object, interfaceName)
 		}
 	}
 }
@@ -526,7 +526,7 @@ func (builder *Builder) validateFieldImplementsInterface(objectField, interfaceF
 			}
 		}
 	} else {
-		return fmt.Errorf("%s declared with type %s but %s requires the type %s or valid sub-type", objectField, objectField.Type, intrface, interfaceField.Type)
+		return fmt.Errorf("%s declared with type '%s' but %s requires the type '%s' or a valid sub-type", objectField, objectField.Type, intrface, interfaceField.Type)
 	}
 	return nil
 }
@@ -539,7 +539,7 @@ func (builder *Builder) validateFieldImplementsInterface(objectField, interfaceF
 //   interface field, but any additional argument must not be required.
 func (builder *Builder) validateArgumentImplementsInterface(objectArg, interfaceArg Argument, intrface Interface) error {
 	if !typeCheck(objectArg.Type, interfaceArg.Type) {
-		return fmt.Errorf("%s declared with type %s but %s requires type %s", objectArg, objectArg.Type, intrface, interfaceArg.Type)
+		return fmt.Errorf("%s declared with type '%s' but %s requires type '%s'", objectArg, objectArg.Type, intrface, interfaceArg.Type)
 	}
 	return nil
 }
@@ -625,7 +625,10 @@ func (builder *Builder) covariantTypeCheck(t1, t2 Type) bool {
 		if !t2.List {
 			return false
 		}
-		return builder.covariantTypeCheck(*t1.SubType, *t2.SubType)
+		if t1.SubType != nil && t2.SubType != nil {
+			return builder.covariantTypeCheck(*t1.SubType, *t2.SubType)
+		}
+		return false
 	}
 
 	if object, err := builder.schema.getObject(t1.Name); err == nil {

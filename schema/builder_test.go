@@ -181,41 +181,54 @@ func TestInvalidInputFieldTypeDoesNotExist(t *testing.T) {
 	AssertSchemaValidationError(expected, actual, t)
 }
 
-// TODO This test fails sometimes, most likely due to map iteration order, change assertion to allow for Interface/Object/etc failure, but not Input Scalar or Enum
-func TestInvalidInputFieldTypeUnacceptable(t *testing.T) {
+func TestInvalidInputFieldUnacceptableInterfaceType(t *testing.T) {
 	expected := NewValidationError("Input(Test) Field(TestInterfaceField) declared with invalid Type 'TestInterface'. An Input Field type must be Input, Scalar, or Enum")
 
 	actual := CapturePanic(func() {
 		NewSchema().
-			Declare(TestEnum).
-			Declare(TestInput).
 			Declare(TestInterface).
-			Declare(TestObject).
-			Declare(TestScalar).
-			Declare(TestUnion).
 			Declare(Input{
 				Name: "Test",
 				Fields: Fields(
 					Field{
-						Name: "TestInputField",
-						Type: DescribeType("TestInput"),
-					},
-					Field{
-						Name: "TestEnumField",
-						Type: DescribeType("TestEnum"),
-					},
-					Field{
-						Name: "TestScalarField",
-						Type: StringType,
-					},
-					Field{
 						Name: "TestInterfaceField",
 						Type: DescribeType("TestInterface"),
 					},
+				),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInputFieldUnacceptableObjectType(t *testing.T) {
+	expected := NewValidationError("Input(Test) Field(TestObjectField) declared with invalid Type 'TestObject'. An Input Field type must be Input, Scalar, or Enum")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(TestObject).
+			Declare(Input{
+				Name: "Test",
+				Fields: Fields(
 					Field{
 						Name: "TestObjectField",
 						Type: DescribeType("TestObject"),
 					},
+				),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInputFieldUnacceptableUnionType(t *testing.T) {
+	expected := NewValidationError("Input(Test) Field(TestUnionField) declared with invalid Type 'TestUnion'. An Input Field type must be Input, Scalar, or Enum")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(TestObject).
+			Declare(TestUnion).
+			Declare(Input{
+				Name: "Test",
+				Fields: Fields(
 					Field{
 						Name: "TestUnionField",
 						Type: DescribeType("TestUnion"),
@@ -384,17 +397,12 @@ func TestInvalidInterfaceFieldArgumentTypeDoesNotExist(t *testing.T) {
 	AssertSchemaValidationError(expected, actual, t)
 }
 
-func TestInvalidInterfaceFieldArgumentTypeUnacceptable(t *testing.T) {
+func TestInvalidInterfaceFieldArgumentUnacceptableInterfaceType(t *testing.T) {
 	expected := NewValidationError("Interface(Test) Field(TestField) Argument(TestArgumentInterface) declared with invalid type 'TestInterface'. An Argument Type must be Input, Scalar, or Enum")
 
 	actual := CapturePanic(func() {
 		NewSchema().
-			Declare(TestEnum).
-			Declare(TestInput).
 			Declare(TestInterface).
-			Declare(TestObject).
-			Declare(TestScalar).
-			Declare(TestUnion).
 			Declare(Interface{
 				Name: "Test",
 				Fields: Fields(
@@ -403,25 +411,55 @@ func TestInvalidInterfaceFieldArgumentTypeUnacceptable(t *testing.T) {
 						Type: StringType,
 						Arguments: Arguments(
 							Argument{
-								Name: "TestArgumentInput",
-								Type: DescribeType("TestInput"),
-							},
-							Argument{
-								Name: "TestArgumentScalar",
-								Type: DescribeType("TestScalar"),
-							},
-							Argument{
-								Name: "TestArgumentEnum",
-								Type: DescribeType("TestEnum"),
-							},
-							Argument{
 								Name: "TestArgumentInterface",
 								Type: DescribeType("TestInterface"),
 							},
+						),
+					},
+				),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInterfaceFieldArgumentUnacceptableObjectType(t *testing.T) {
+	expected := NewValidationError("Interface(Test) Field(TestField) Argument(TestArgumentObject) declared with invalid type 'TestObject'. An Argument Type must be Input, Scalar, or Enum")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(TestObject).
+			Declare(Interface{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: StringType,
+						Arguments: Arguments(
 							Argument{
 								Name: "TestArgumentObject",
 								Type: DescribeType("TestObject"),
 							},
+						),
+					},
+				),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidInterfaceFieldArgumentUnacceptableUnionType(t *testing.T) {
+	expected := NewValidationError("Interface(Test) Field(TestField) Argument(TestArgumentUnion) declared with invalid type 'TestUnion'. An Argument Type must be Input, Scalar, or Enum")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(TestUnion).
+			Declare(Interface{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: StringType,
+						Arguments: Arguments(
 							Argument{
 								Name: "TestArgumentUnion",
 								Type: DescribeType("TestUnion"),
@@ -491,6 +529,323 @@ func TestInvalidObjectWithoutFields(t *testing.T) {
 		NewSchema().Declare(Object{
 			Name: "Test",
 		}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldName(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field declared with an invalid Name 'Invalid Field Name!'. A Name must only consist of ASCII letters, numbers, and underscores")
+
+	actual := CapturePanic(func() {
+		NewSchema().Declare(Object{
+			Name: "Test",
+			Fields: Fields(
+				Field{
+					Name: "Invalid Field Name!",
+				},
+			),
+		}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldTypeDoesNotExist(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(TestField) declared with unknown type 'FooBar'")
+
+	actual := CapturePanic(func() {
+		NewSchema().Declare(Object{
+			Name: "Test",
+			Fields: Fields(
+				Field{
+					Name: "TestField",
+					Type: DescribeType("FooBar"),
+				},
+			),
+		}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldTypeUnacceptable(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(TestField) declared with Input type 'TestInput'")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Object{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: DescribeType("TestInput"),
+					},
+				),
+			}).
+			Declare(TestInput).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldArgumentName(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(TestField) Argument: declared with an invalid Name 'Test Argument'. A Name must only consist of ASCII letters, numbers, and underscores")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Object{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: StringType,
+						Arguments: Arguments(
+							Argument{
+								Name: "Test Argument",
+							},
+						),
+					},
+				),
+			}).
+			Declare(TestInput).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldArgumentTypeDoesNotExist(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(TestField) Argument(TestArgument) declared with unknown type 'FooBar'")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Object{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: StringType,
+						Arguments: Arguments(
+							Argument{
+								Name: "TestArgument",
+								Type: DescribeType("FooBar"),
+							},
+						),
+					},
+				),
+			}).
+			Declare(TestInput).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldArgumentUnacceptableInterfaceType(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(TestField) Argument(TestArgumentInterface) declared with invalid type 'TestInterface'. An Argument Type must be Input, Scalar, or Enum")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(TestInterface).
+			Declare(Object{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: StringType,
+						Arguments: Arguments(
+							Argument{
+								Name: "TestArgumentInterface",
+								Type: DescribeType("TestInterface"),
+							},
+						),
+					},
+				),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldArgumentUnacceptableObjectType(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(TestField) Argument(TestArgumentObject) declared with invalid type 'TestObject'. An Argument Type must be Input, Scalar, or Enum")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(TestObject).
+			Declare(Object{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: StringType,
+						Arguments: Arguments(
+							Argument{
+								Name: "TestArgumentObject",
+								Type: DescribeType("TestObject"),
+							},
+						),
+					},
+				),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldArgumentUnacceptableUnionType(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(TestField) Argument(TestArgumentUnion) declared with invalid type 'TestUnion'. An Argument Type must be Input, Scalar, or Enum")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(TestUnion).
+			Declare(Object{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: StringType,
+						Arguments: Arguments(
+							Argument{
+								Name: "TestArgumentUnion",
+								Type: DescribeType("TestUnion"),
+							},
+						),
+					},
+				),
+			}).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectFieldArgumentNonNullWithDefaultValue(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(TestField) Argument(TestArgument) declared with a default value, but its type is non-null")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Object{
+				Name: "Test",
+				Fields: Fields(
+					Field{
+						Name: "TestField",
+						Type: StringType,
+						Arguments: Arguments(
+							Argument{
+								Name:    "TestArgument",
+								Type:    NonNullStringType,
+								Default: "DefaultString",
+							},
+						),
+					},
+				),
+			}).
+			Declare(TestInput).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectImplementsUnknownInterface(t *testing.T) {
+	expected := NewValidationError("Object(Test) declared implementing unknown Interface 'FooBar'")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Object{
+				Name:       "Test",
+				Implements: Interfaces("FooBar"),
+				Fields: Fields(
+					Field{
+						Name: "NonInterfaceField",
+						Type: StringType,
+					},
+				),
+			}).
+			Declare(TestInput).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectInterfaceFieldNotImplemented(t *testing.T) {
+	expected := NewValidationError("Object(Test) declared without Field(SomeInterfaceField1) required by Interface(SomeInterface)")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Interface{
+				Name: "SomeInterface",
+				Fields: Fields(
+					Field{
+						Name: "SomeInterfaceField1",
+						Type: StringType,
+					},
+				),
+			}).
+			Declare(Object{
+				Name:       "Test",
+				Implements: Interfaces("SomeInterface"),
+				Fields: Fields(
+					Field{
+						Name: "NonInterfaceField",
+						Type: StringType,
+					},
+				),
+			}).
+			Declare(TestInput).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectInterfaceFieldImplementedWithWrongType(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(SomeInterfaceField1) declared with type 'Boolean' but Interface(SomeInterface) requires the type 'String' or a valid sub-type")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Interface{
+				Name: "SomeInterface",
+				Fields: Fields(
+					Field{
+						Name: "SomeInterfaceField1",
+						Type: StringType,
+					},
+				),
+			}).
+			Declare(Object{
+				Name:       "Test",
+				Implements: Interfaces("SomeInterface"),
+				Fields: Fields(
+					Field{
+						Name: "NonInterfaceField",
+						Type: StringType,
+					},
+					Field{
+						Name: "SomeInterfaceField1",
+						Type: BooleanType,
+					},
+				),
+			}).
+			Declare(TestInput).Build()
+	})
+	AssertSchemaValidationError(expected, actual, t)
+}
+
+func TestInvalidObjectInterfaceFieldImplementedWithCorrectTypeButWrongVariant(t *testing.T) {
+	expected := NewValidationError("Object(Test) Field(SomeInterfaceField1) declared with type 'String!' but Interface(SomeInterface) requires the type 'String' or a valid sub-type")
+
+	actual := CapturePanic(func() {
+		NewSchema().
+			Declare(Interface{
+				Name: "SomeInterface",
+				Fields: Fields(
+					Field{
+						Name: "SomeInterfaceField1",
+						Type: StringType,
+					},
+				),
+			}).
+			Declare(Object{
+				Name:       "Test",
+				Implements: Interfaces("SomeInterface"),
+				Fields: Fields(
+					Field{
+						Name: "NonInterfaceField",
+						Type: StringType,
+					},
+					Field{
+						Name: "SomeInterfaceField1",
+						Type: NonNullStringType,
+					},
+				),
+			}).
+			Declare(TestInput).Build()
 	})
 	AssertSchemaValidationError(expected, actual, t)
 }

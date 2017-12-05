@@ -2,6 +2,8 @@ package schema
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var TestEnum = Enum{
@@ -65,7 +67,7 @@ func TestInvalidSchemaMultipleDeclarationsWithTheSameName(t *testing.T) {
 				Name: "Duplicate",
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 ///
@@ -78,7 +80,7 @@ func TestInvalidEnumNameUndeclared(t *testing.T) {
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Enum{}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidEnumNameCharacters(t *testing.T) {
@@ -89,7 +91,7 @@ func TestInvalidEnumNameCharacters(t *testing.T) {
 			Name: "Some Enum With Spaces",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidEnumWithoutValues(t *testing.T) {
@@ -100,7 +102,7 @@ func TestInvalidEnumWithoutValues(t *testing.T) {
 			Name: "Test",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidEnumWithDuplicateValues(t *testing.T) {
@@ -112,7 +114,7 @@ func TestInvalidEnumWithDuplicateValues(t *testing.T) {
 			Values: Values("TEST_A", "TEST_B", "TEST_C", "TEST_B", "TEST_D"),
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 ///
@@ -125,7 +127,7 @@ func TestInvalidInputNameUndeclared(t *testing.T) {
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Input{}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInputNameCharacters(t *testing.T) {
@@ -136,7 +138,7 @@ func TestInvalidInputNameCharacters(t *testing.T) {
 			Name: "InputName!",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInputWithoutFields(t *testing.T) {
@@ -147,7 +149,7 @@ func TestInvalidInputWithoutFields(t *testing.T) {
 			Name: "Test",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInputFieldName(t *testing.T) {
@@ -162,7 +164,7 @@ func TestInvalidInputFieldName(t *testing.T) {
 				}),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInputFieldTypeDoesNotExist(t *testing.T) {
@@ -178,7 +180,7 @@ func TestInvalidInputFieldTypeDoesNotExist(t *testing.T) {
 				}),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInputFieldUnacceptableInterfaceType(t *testing.T) {
@@ -197,7 +199,7 @@ func TestInvalidInputFieldUnacceptableInterfaceType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInputFieldUnacceptableObjectType(t *testing.T) {
@@ -216,7 +218,7 @@ func TestInvalidInputFieldUnacceptableObjectType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInputFieldUnacceptableUnionType(t *testing.T) {
@@ -236,7 +238,7 @@ func TestInvalidInputFieldUnacceptableUnionType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInputFieldWithArguments(t *testing.T) {
@@ -258,7 +260,7 @@ func TestInvalidInputFieldWithArguments(t *testing.T) {
 				}),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 ///
@@ -271,7 +273,7 @@ func TestInvalidInterfaceNameUndeclared(t *testing.T) {
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Interface{}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceNameCharacters(t *testing.T) {
@@ -282,7 +284,7 @@ func TestInvalidInterfaceNameCharacters(t *testing.T) {
 			Name: "Interface%",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceWithoutFields(t *testing.T) {
@@ -293,7 +295,7 @@ func TestInvalidInterfaceWithoutFields(t *testing.T) {
 			Name: "Test",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldName(t *testing.T) {
@@ -309,7 +311,7 @@ func TestInvalidInterfaceFieldName(t *testing.T) {
 			),
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldTypeDoesNotExist(t *testing.T) {
@@ -326,7 +328,7 @@ func TestInvalidInterfaceFieldTypeDoesNotExist(t *testing.T) {
 			),
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldTypeUnacceptable(t *testing.T) {
@@ -345,7 +347,7 @@ func TestInvalidInterfaceFieldTypeUnacceptable(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldArgumentName(t *testing.T) {
@@ -369,7 +371,7 @@ func TestInvalidInterfaceFieldArgumentName(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldArgumentTypeDoesNotExist(t *testing.T) {
@@ -394,7 +396,7 @@ func TestInvalidInterfaceFieldArgumentTypeDoesNotExist(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldArgumentUnacceptableInterfaceType(t *testing.T) {
@@ -419,7 +421,7 @@ func TestInvalidInterfaceFieldArgumentUnacceptableInterfaceType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldArgumentUnacceptableObjectType(t *testing.T) {
@@ -444,7 +446,7 @@ func TestInvalidInterfaceFieldArgumentUnacceptableObjectType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldArgumentUnacceptableUnionType(t *testing.T) {
@@ -469,7 +471,7 @@ func TestInvalidInterfaceFieldArgumentUnacceptableUnionType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidInterfaceFieldArgumentNonNullWithDefaultValue(t *testing.T) {
@@ -495,7 +497,7 @@ func TestInvalidInterfaceFieldArgumentNonNullWithDefaultValue(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 ///
@@ -508,7 +510,7 @@ func TestInvalidObjectNameUndeclared(t *testing.T) {
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Object{}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectNameCharacters(t *testing.T) {
@@ -519,7 +521,7 @@ func TestInvalidObjectNameCharacters(t *testing.T) {
 			Name: "Object$",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectWithoutFields(t *testing.T) {
@@ -530,7 +532,7 @@ func TestInvalidObjectWithoutFields(t *testing.T) {
 			Name: "Test",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldName(t *testing.T) {
@@ -546,7 +548,7 @@ func TestInvalidObjectFieldName(t *testing.T) {
 			),
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldTypeDoesNotExist(t *testing.T) {
@@ -563,7 +565,7 @@ func TestInvalidObjectFieldTypeDoesNotExist(t *testing.T) {
 			),
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldTypeUnacceptable(t *testing.T) {
@@ -582,7 +584,7 @@ func TestInvalidObjectFieldTypeUnacceptable(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldArgumentName(t *testing.T) {
@@ -606,7 +608,7 @@ func TestInvalidObjectFieldArgumentName(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldArgumentTypeDoesNotExist(t *testing.T) {
@@ -631,7 +633,7 @@ func TestInvalidObjectFieldArgumentTypeDoesNotExist(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldArgumentUnacceptableInterfaceType(t *testing.T) {
@@ -656,7 +658,7 @@ func TestInvalidObjectFieldArgumentUnacceptableInterfaceType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldArgumentUnacceptableObjectType(t *testing.T) {
@@ -681,7 +683,7 @@ func TestInvalidObjectFieldArgumentUnacceptableObjectType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldArgumentUnacceptableUnionType(t *testing.T) {
@@ -706,7 +708,7 @@ func TestInvalidObjectFieldArgumentUnacceptableUnionType(t *testing.T) {
 				),
 			}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectFieldArgumentNonNullWithDefaultValue(t *testing.T) {
@@ -732,7 +734,7 @@ func TestInvalidObjectFieldArgumentNonNullWithDefaultValue(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectImplementsUnknownInterface(t *testing.T) {
@@ -752,7 +754,7 @@ func TestInvalidObjectImplementsUnknownInterface(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectInterfaceFieldNotImplemented(t *testing.T) {
@@ -781,7 +783,7 @@ func TestInvalidObjectInterfaceFieldNotImplemented(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectInterfaceFieldImplementedWithWrongType(t *testing.T) {
@@ -814,7 +816,7 @@ func TestInvalidObjectInterfaceFieldImplementedWithWrongType(t *testing.T) {
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidObjectInterfaceFieldImplementedWithCorrectTypeButWrongVariant(t *testing.T) {
@@ -847,7 +849,7 @@ func TestInvalidObjectInterfaceFieldImplementedWithCorrectTypeButWrongVariant(t 
 			}).
 			Declare(TestInput).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 ///
@@ -860,7 +862,7 @@ func TestInvalidScalarNameUndeclared(t *testing.T) {
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Scalar{}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidScalarNameCharacters(t *testing.T) {
@@ -871,7 +873,7 @@ func TestInvalidScalarNameCharacters(t *testing.T) {
 			Name: "Scalar&",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 ///
@@ -884,7 +886,7 @@ func TestInvalidUnionNameUndeclared(t *testing.T) {
 	actual := CapturePanic(func() {
 		NewSchema().Declare(Union{}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidUnionNameCharacters(t *testing.T) {
@@ -895,7 +897,7 @@ func TestInvalidUnionNameCharacters(t *testing.T) {
 			Name: "Union()",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidUnionWithoutMembers(t *testing.T) {
@@ -906,7 +908,7 @@ func TestInvalidUnionWithoutMembers(t *testing.T) {
 			Name: "Test",
 		}).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidUnionWithDuplicateMembers(t *testing.T) {
@@ -920,7 +922,7 @@ func TestInvalidUnionWithDuplicateMembers(t *testing.T) {
 			}).
 			Declare(TestObject).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidUnionMemberTypeDoesNotExist(t *testing.T) {
@@ -934,7 +936,7 @@ func TestInvalidUnionMemberTypeDoesNotExist(t *testing.T) {
 			}).
 			Declare(TestObject).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 func TestInvalidUnionMemberNonObjectMemberType(t *testing.T) {
@@ -952,7 +954,7 @@ func TestInvalidUnionMemberNonObjectMemberType(t *testing.T) {
 			Declare(TestObject).
 			Declare(TestScalar).Build()
 	})
-	AssertSchemaValidationError(expected, actual, t)
+	assert.Equal(t, expected, actual)
 }
 
 // Capture the panic from function f and return it as an error
@@ -966,14 +968,4 @@ func CapturePanic(f func()) (err error) {
 	}()
 	f()
 	return
-}
-
-func AssertSchemaValidationError(expected error, actual error, t *testing.T) {
-	if actual == nil {
-		t.Errorf("expected '%s' but error was nil", expected)
-	} else {
-		if actual.Error() != expected.Error() {
-			t.Errorf("expected '%s' but got '%s'", expected, actual)
-		}
-	}
 }

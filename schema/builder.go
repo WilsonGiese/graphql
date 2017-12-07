@@ -517,7 +517,6 @@ func (builder *Builder) validateFieldImplementsInterface(objectField, interfaceF
 		}
 
 		// Validate all aditional Field Arguments are not required
-		// TODO this is wrong, idiot! If THIS interface doesn't require this field, ANOTHER might.
 		for _, objectArgument := range objectField.Arguments {
 			if _, exists := interfaceField.Arguments[objectArgument.Name]; !exists {
 				if objectArgument.Type.NonNull {
@@ -531,12 +530,8 @@ func (builder *Builder) validateFieldImplementsInterface(objectField, interfaceF
 	return nil
 }
 
-// - The object field must include an argument of the same name for every
-//   argument defined in the interface field.
-// 		- The object field argument must accept the same type (invariant) as the
-//      interface field argument.
-// - The object field may include additional arguments not defined in the
-//   interface field, but any additional argument must not be required.
+// TODO determine what to do with default values, if interface defines default,
+//      does the object default need to be the same, or can it differ?
 func (builder *Builder) validateArgumentImplementsInterface(objectArg, interfaceArg Argument, intrface Interface) error {
 	if !typeCheck(objectArg.Type, interfaceArg.Type) {
 		return fmt.Errorf("%s declared with type '%s' but %s requires type '%s'", objectArg, objectArg.Type, intrface, interfaceArg.Type)
@@ -582,20 +577,24 @@ func (builder *Builder) validateName(name string) error {
 
 func (builder *Builder) validateType(t Type) error {
 	// If t is a list type, pull out the underlying base type
-	actualType := t
+	baseType := t
 	for {
-		if !actualType.List {
+		if !baseType.List {
 			break
 		}
 
-		if t.SubType == nil {
-			return fmt.Errorf("type %s has nil sub-type", t)
+		if baseType.SubType == nil {
+			return fmt.Errorf("type declared with a nil sub-type")
 		}
-		actualType = *t.SubType
+		baseType = *t.SubType
 	}
 
-	if declaration := builder.schema.getDeclaration(actualType); declaration == nil {
-		return fmt.Errorf("declared with unknown type '%s'", actualType.Name)
+	if err := builder.validateName(baseType.Name); err != nil {
+		return fmt.Errorf("type %s", err)
+	}
+
+	if declaration := builder.schema.getDeclaration(baseType); declaration == nil {
+		return fmt.Errorf("declared with unknown type '%s'", baseType.Name)
 	}
 	return nil
 }

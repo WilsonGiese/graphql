@@ -349,14 +349,14 @@ func (builder *Builder) Declare(declaration Declaration) *Builder {
 }
 
 func (builder *Builder) declareTypeName(declaration Declaration) error {
-	if err := builder.validateName(declaration.name()); err != nil {
+	if err := builder.validateName(declaration.GetName()); err != nil {
 		return err
 	}
 
-	if _, exists := builder.declaredTypeNames[declaration.name()]; exists {
-		return fmt.Errorf("declared with name '%s' but another type with that name has already been declared", declaration.name())
+	if _, exists := builder.declaredTypeNames[declaration.GetName()]; exists {
+		return fmt.Errorf("declared with name '%s' but another type with that name has already been declared", declaration.GetName())
 	}
-	builder.declaredTypeNames[declaration.name()] = struct{}{}
+	builder.declaredTypeNames[declaration.GetName()] = struct{}{}
 	return nil
 }
 
@@ -399,7 +399,7 @@ func (builder *Builder) validateInputField(field Field) error {
 	}
 
 	// Input field types can only be input, scalar, or enum
-	switch builder.schema.getDeclaration(field.Type).typeKind() {
+	switch builder.schema.GetDeclaration(field.Type).TypeKind() {
 	case INPUT_OBJECT:
 	case SCALAR:
 	case ENUM:
@@ -468,9 +468,9 @@ func (builder *Builder) validateUnion(union Union) {
 	}
 
 	for _, unionTypeName := range union.Types {
-		if declaration := builder.schema.getDeclaration(DescribeType(unionTypeName)); declaration == nil {
+		if declaration := builder.schema.GetDeclaration(DescribeType(unionTypeName)); declaration == nil {
 			builder.err("%s declared with unknown type %s", union, unionTypeName)
-		} else if declaration.typeKind() != OBJECT {
+		} else if declaration.TypeKind() != OBJECT {
 			builder.err("%s declared with member type %s. Union members must be Objects", union, unionTypeName)
 		}
 	}
@@ -490,7 +490,7 @@ func (builder *Builder) validateField(field Field) error {
 		return fmt.Errorf("%s %s", field, err)
 	}
 
-	if builder.schema.getDeclaration(field.Type).typeKind() == INPUT_OBJECT {
+	if builder.schema.GetDeclaration(field.Type).TypeKind() == INPUT_OBJECT {
 		return fmt.Errorf("%s declared with Input type '%s'", field, field.Type)
 	}
 
@@ -549,7 +549,7 @@ func (builder *Builder) validateArgument(argument Argument) error {
 	}
 
 	// Input field types can only be input, scalar, or enum
-	switch builder.schema.getDeclaration(argument.Type).typeKind() {
+	switch builder.schema.GetDeclaration(argument.Type).TypeKind() {
 	case INPUT_OBJECT:
 	case SCALAR:
 	case ENUM:
@@ -593,7 +593,7 @@ func (builder *Builder) validateType(t Type) error {
 		return fmt.Errorf("type %s", err)
 	}
 
-	if declaration := builder.schema.getDeclaration(baseType); declaration == nil {
+	if declaration := builder.schema.GetDeclaration(baseType); declaration == nil {
 		return fmt.Errorf("declared with unknown type '%s'", baseType.Name)
 	}
 	return nil

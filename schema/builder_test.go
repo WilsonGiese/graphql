@@ -422,6 +422,36 @@ func TestObjectTypeImplementsInterfaceWithCovariantTypes(t *testing.T) {
 	assert.NotNil(t, schema)
 }
 
+func TestUnionType(t *testing.T) {
+	schema := NewSchema().
+		Declare(Object{
+			Name: "Object1",
+			Fields: Fields(
+				Field{
+					Name: "Field",
+					Type: StringType,
+				},
+			),
+		}).
+		Declare(Object{
+			Name: "Object2",
+			Fields: Fields(
+				Field{
+					Name: "Field",
+					Type: StringType,
+				},
+			),
+		}).
+		Declare(Union{
+			Name:  "Object1OrObject2",
+			Types: Types("Object1", "Object2"),
+		}).Build()
+	assert.NotNil(t, schema)
+	union, err := schema.getUnion("Object1OrObject2")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"Object1", "Object2"}, union.Types)
+}
+
 ///
 // Invalid Schema Tests
 ///

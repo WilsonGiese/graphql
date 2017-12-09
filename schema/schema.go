@@ -28,8 +28,8 @@ func newSchema() *Schema {
 
 // Declaration represents a declared Type in the GraphQL Schema
 type Declaration interface {
-	name() string
-	typeKind() TypeKind
+	GetName() string
+	TypeKind() TypeKind
 }
 
 // TypeKind represents the type of a Schema declaration
@@ -56,12 +56,12 @@ type Scalar struct {
 	Description string
 }
 
-func (scalar Scalar) name() string {
+func (scalar Scalar) GetName() string {
 	return scalar.Name
 }
 
 // TypeKind returns the TypeKind of Scalar
-func (scalar Scalar) typeKind() TypeKind {
+func (scalar Scalar) TypeKind() TypeKind {
 	return SCALAR
 }
 
@@ -72,12 +72,12 @@ type Enum struct {
 	Description string
 }
 
-func (enum Enum) name() string {
+func (enum Enum) GetName() string {
 	return enum.Name
 }
 
 // TypeKind returns the TypeKind of Enum
-func (enum Enum) typeKind() TypeKind {
+func (enum Enum) TypeKind() TypeKind {
 	return ENUM
 }
 
@@ -92,12 +92,12 @@ type Input struct {
 	Fields      map[string]Field
 }
 
-func (input Input) name() string {
+func (input Input) GetName() string {
 	return input.Name
 }
 
 // TypeKind returns the TypeKind of Input
-func (input Input) typeKind() TypeKind {
+func (input Input) TypeKind() TypeKind {
 	return INPUT_OBJECT
 }
 
@@ -112,12 +112,12 @@ type Interface struct {
 	Fields      map[string]Field
 }
 
-func (intrface Interface) name() string {
+func (intrface Interface) GetName() string {
 	return intrface.Name
 }
 
 // TypeKind returns the TypeKind of Interface
-func (intrface Interface) typeKind() TypeKind {
+func (intrface Interface) TypeKind() TypeKind {
 	return INTERFACE
 }
 
@@ -132,12 +132,12 @@ type Union struct {
 	Types       []string
 }
 
-func (union Union) name() string {
+func (union Union) GetName() string {
 	return union.Name
 }
 
 // TypeKind returns the TypeKind of Union
-func (union Union) typeKind() TypeKind {
+func (union Union) TypeKind() TypeKind {
 	return UNION
 }
 
@@ -153,12 +153,12 @@ type Object struct {
 	Fields      map[string]Field
 }
 
-func (object Object) name() string {
+func (object Object) GetName() string {
 	return object.Name
 }
 
 // TypeKind returns the TypeKind of Object
-func (object Object) typeKind() TypeKind {
+func (object Object) TypeKind() TypeKind {
 	return OBJECT
 }
 
@@ -260,9 +260,9 @@ func (schema *Schema) getUnion(name string) (Union, error) {
 
 // getDeclaration returns the Declaration for a Type. If the type is a list type
 // it will return the unwrapped type; e.g. [[String]] -> String
-func (schema *Schema) getDeclaration(t Type) Declaration {
+func (schema *Schema) GetDeclaration(t Type) Declaration {
 	if t.List {
-		return schema.getDeclaration(*t.SubType)
+		return schema.GetDeclaration(*t.SubType)
 	}
 
 	if scalar, exists := schema.scalars[t.Name]; exists {

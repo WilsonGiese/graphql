@@ -23,11 +23,11 @@ func validate(schema *schema.Schema, document *Document) {
 	}
 
 	for i := 0; i < len(document.Operations); i++ {
-		v.validateOperation(&document.Operations[i])
+		v.validateOperation(document.Operations[i])
 	}
 
 	for i := 0; i < len(document.Fragments); i++ {
-		v.validateFragment(&document.Fragments[i])
+		v.validateFragment(document.Fragments[i])
 	}
 
 	// Final validation checks
@@ -45,7 +45,7 @@ func validate(schema *schema.Schema, document *Document) {
 //  Lone Anonymous Operation:
 //    If any anonymous operation (namless) exists, no other operation can be
 //    defined
-func (v *validator) validateOperation(operation *Operation) {
+func (v *validator) validateOperation(operation Operation) {
 	// Lone Anonymous Operation
 	if operation.Name == "" {
 		if len(v.document.Operations) > 1 {
@@ -61,13 +61,17 @@ func (v *validator) validateOperation(operation *Operation) {
 	}
 }
 
+func (v *validator) validateSelectionSet(target schema.Declaration, selectionSet SelectionSet) {
+
+}
+
 // Fragment Rules
 //  Fragment Name Uniqueness
 //    Every fragment must have a unique name
 //  Fragment Spread Type Existence TODO must validated for inline fragments as well
 //    The "on" type for the Fragment definition must exist in the Schema
 //
-func (v *validator) validateFragment(fragment *Fragment) {
+func (v *validator) validateFragment(fragment Fragment) {
 	// Fragment Name Uniqueness
 	if _, exists := v.operationNames[fragment.Name]; exists {
 		v.error("Fragment Name Uniqueness error: duplicate fragment definition found: %s", fragment.Name)

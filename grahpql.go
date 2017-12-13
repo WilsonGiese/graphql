@@ -70,3 +70,10 @@ type Field struct {
 	Directives   []Directive
 	SelectionSet SelectionSet
 }
+
+// IsLeaf returns true if the field does not have a child selection set
+func (field *Field) IsLeaf() bool {
+	return len(field.SelectionSet.Fields) == 0 &&
+		len(field.SelectionSet.FragmentSpreads) == 0 &&
+		len(field.SelectionSet.InlineFragments) == 0
+}

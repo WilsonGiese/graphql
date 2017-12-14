@@ -266,7 +266,7 @@ func (p *Parser) parseSelectionSet() (selectionSet SelectionSet) {
 
 func (p *Parser) parseFragmentSpread() (fragmentSpread FragmentSpread) {
 	p.expect(Spread)
-	fragmentSpread.Type = p.expect(Name).Value
+	fragmentSpread.Name = p.expect(Name).Value
 	fragmentSpread.Directives = p.parseDirectives()
 
 	return

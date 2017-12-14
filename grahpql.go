@@ -1,8 +1,19 @@
 package graphql
 
+import "errors"
+
 type Document struct {
 	Operations []Operation
 	Fragments  []Fragment
+}
+
+func (document *Document) GetFragment(name string) (Fragment, error) {
+	for _, fragment := range document.Fragments {
+		if fragment.Name == name {
+			return fragment, nil
+		}
+	}
+	return Fragment{}, errors.New("No fragment found with that name")
 }
 
 type Operation struct {
@@ -45,6 +56,14 @@ type SelectionSet struct {
 	FragmentSpreads []FragmentSpread
 }
 
+// IsEmpty returns true if the SelectionSet contains no field selections
+// or fragments; false otherwise
+func (selectionSet SelectionSet) IsEmpty() bool {
+	return len(selectionSet.Fields) == 0 &&
+		len(selectionSet.FragmentSpreads) == 0 &&
+		len(selectionSet.InlineFragments) == 0
+}
+
 type Fragment struct {
 	Name         string
 	Type         string
@@ -59,7 +78,7 @@ type InlineFragment struct {
 }
 
 type FragmentSpread struct {
-	Type       string
+	Name       string
 	Directives []Directive
 }
 
@@ -69,11 +88,4 @@ type Field struct {
 	Arguments    map[string]Value
 	Directives   []Directive
 	SelectionSet SelectionSet
-}
-
-// IsLeaf returns true if the field does not have a child selection set
-func (field *Field) IsLeaf() bool {
-	return len(field.SelectionSet.Fields) == 0 &&
-		len(field.SelectionSet.FragmentSpreads) == 0 &&
-		len(field.SelectionSet.InlineFragments) == 0
 }

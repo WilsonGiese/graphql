@@ -11,6 +11,11 @@ type Parser struct {
 	position int
 }
 
+func Parse(tokens []Token) (document Document, err error) {
+	p := Parser{tokens: tokens}
+	return p.parse()
+}
+
 // Parse a GraphQL document (e.g. Query, Mutation, etc)
 func (p *Parser) parse() (document Document, err error) {
 
@@ -47,7 +52,7 @@ func (p *Parser) parseDocument() (document Document) {
 	}
 	p.expect(EOF)
 
-	return Document{}
+	return document
 }
 
 // OperationDefinition
@@ -146,6 +151,9 @@ func (p *Parser) parseValue() (v Value) {
 	case Float:
 		p.take()
 		v.Value = token.Value
+	case Dollar:
+		p.take()
+		v.Value = p.expect(Name)
 	case OpenBracket:
 		v.Value = p.parseListValue()
 	case OpenBrace:
@@ -210,10 +218,12 @@ func (p *Parser) parseDirective() (directive Directive) {
 	return
 }
 
-func (p *Parser) parseArguments() (arguments map[string]Value) {
+func (p *Parser) parseArguments() map[string]Value {
+	arguments := make(map[string]Value)
+
 	p.expect(OpenParen)
 	for {
-		if p.peek().Type == Name {
+		if p.peek().Type != Name {
 			break
 		}
 
@@ -227,7 +237,7 @@ func (p *Parser) parseArguments() (arguments map[string]Value) {
 		arguments[name.Value] = value
 	}
 	p.expect(ClosedParen)
-	return
+	return arguments
 }
 
 func (p *Parser) parseSelectionSet() (selectionSet SelectionSet) {

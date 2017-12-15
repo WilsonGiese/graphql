@@ -13,7 +13,7 @@ import (
 // a list of Tokens corressponding to the text. Returns an error if one occurs
 // during the reading of runes from the Reader, or if there are invalid tokens
 // in the text according to the GraphQL language specifcation
-func Tokenize(r io.Reader) ([]Token, error) {
+func Tokenize(r io.Reader, ignoreWhitespace bool) ([]Token, error) {
 	var tokens []Token
 	lexer := lexer{reader: bufio.NewReader(r)}
 
@@ -23,7 +23,15 @@ func Tokenize(r io.Reader) ([]Token, error) {
 		if err != nil {
 			return tokens, err
 		}
-		tokens = append(tokens, token)
+
+		// Ignore Whitespace
+		if ignoreWhitespace {
+			if token.Type != Whitespace && token.Type != LineTerminator {
+				tokens = append(tokens, token)
+			}
+		} else {
+			tokens = append(tokens, token)
+		}
 
 		if token.Type == EOF {
 			return tokens, nil

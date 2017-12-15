@@ -443,7 +443,7 @@ func TestLexerTokenize(t *testing.T) {
 	// Positive test cases
 	for _, test := range lexerTokenizeTestsPositive {
 
-		actual, _ := Tokenize(strings.NewReader(test.input))
+		actual, _ := Tokenize(strings.NewReader(test.input), false)
 
 		if len(actual) < 1 {
 			t.Errorf("Tokenize(%s): Returned no tokens", test.input)
@@ -462,7 +462,7 @@ func TestLexerTokenize(t *testing.T) {
 
 	// Negative test cases
 	for _, test := range lexerTokenizeNegativeTests {
-		_, actual := Tokenize(strings.NewReader(test.input))
+		_, actual := Tokenize(strings.NewReader(test.input), false)
 
 		if actual == nil {
 			t.Errorf("Tokenize(%s): Expected error, but was nil", test.input)

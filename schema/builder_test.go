@@ -1525,8 +1525,11 @@ func CapturePanic(f func()) (err error) {
 
 // GraphQL Schema Example Implementation
 // http://facebook.github.io/graphql/October2016/#sec-Validation
-func TestExampleSchema(t *testing.T) {
-	schema := NewSchema().
+
+var SampleSchema *Schema
+
+func init() {
+	SampleSchema = NewSchema().
 		Declare(Enum{
 			Description: "Commands that a Dog may know",
 			Name:        "DogCommand",
@@ -1692,5 +1695,4 @@ func TestExampleSchema(t *testing.T) {
 				},
 			),
 		}).Build()
-	assert.NotNil(t, schema)
 }

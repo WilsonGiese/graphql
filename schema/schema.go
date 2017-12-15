@@ -26,6 +26,18 @@ func newSchema() *Schema {
 	}
 }
 
+// GetObjectsThatImplement returns a list of Object type names that implement
+// the interface name provided. An empty list is returned if no types implement
+// that interface, or the interface is not a part of the Schema
+func (schema *Schema) GetObjectsThatImplement(interfaceName string) (objectNames []string) {
+	for _, object := range schema.objects {
+		if object.ImplementsInterface(interfaceName) {
+			objectNames = append(objectNames, object.Name)
+		}
+	}
+	return
+}
+
 // Declaration represents a declared Type in the GraphQL Schema
 type Declaration interface {
 	GetName() string
@@ -164,6 +176,15 @@ func (object Object) TypeKind() TypeKind {
 
 func (object Object) String() string {
 	return fmt.Sprintf("Object(%s)", object.Name)
+}
+
+func (object Object) ImplementsInterface(interfaceName string) bool {
+	for _, name := range object.Implements {
+		if interfaceName == name {
+			return true
+		}
+	}
+	return false
 }
 
 // Field describes a Field for a Type defined within a Schema

@@ -16,18 +16,20 @@ type validator struct {
 
 var EXISTS struct{}
 
-func validate(schema *schema.Schema, document *Document) {
+func validate(schema *schema.Schema, document *Document) []error {
 	v := validator{
-		schema:   schema,
-		document: document,
+		schema:         schema,
+		document:       document,
+		operationNames: make(map[string]struct{}),
+		fragmentNames:  make(map[string]struct{}),
 	}
 
-	for i := 0; i < len(document.Operations); i++ {
-		v.validateOperation(document.Operations[i])
+	for _, operation := range document.Operations {
+		v.validateOperation(operation)
 	}
 
-	for i := 0; i < len(document.Fragments); i++ {
-		v.validateFragment(document.Fragments[i])
+	for _, fragment := range document.Fragments {
+		v.validateFragment(fragment)
 	}
 
 	// Final validation checks
@@ -35,6 +37,7 @@ func validate(schema *schema.Schema, document *Document) {
 	//  Fragments Must Be Used:
 	//    Every fragment must be used at least once
 	//
+	return v.errors
 }
 
 // Operation Rules
@@ -58,6 +61,11 @@ func (v *validator) validateOperation(operation Operation) {
 		v.error("Operation Name Uniqueness error: duplicate operation definition found: %s", operation.Name)
 	} else {
 		v.operationNames[operation.Name] = EXISTS
+	}
+
+	if operation.Type == "query" {
+		queryRootType := v.schema.GetDeclaration(schema.DescribeType("QueryRoot"))
+		v.validateSelectionSet(queryRootType, operation.SelectionSet)
 	}
 }
 
@@ -87,55 +95,96 @@ func (v *validator) validateField(selectionType schema.Declaration, field Field)
 	v.validateSelectionSet(selectionType, field.SelectionSet)
 
 	//v.validateDirectives(field.Directives)
-	//v.validateArguments(selectionType, field.Arguments)
 }
 
 func (v *validator) validateInlineFragment(inlineFragment InlineFragment) {
 	if declaration := v.schema.GetDeclaration(schema.DescribeType(inlineFragment.Type)); declaration == nil {
 		v.error("Inline Fragment Spread Type Existence error: target type '%s' does not exist in the schema", inlineFragment.Type)
 	} else {
-
+		v.validateSelectionSet(declaration, inlineFragment.SelectionSet)
 	}
+
 	// TODO nested fragment validation
 }
 
-func (v *validator) validateInterfaceSelectionSet(intrface schema.Interface, selectionSet SelectionSet) {
-	for _, selectedField := range selectionSet.Fields {
-		if actualField, exists := intrface.Fields[selectedField.Name]; exists {
-			v.validateField(v.schema.GetDeclaration(actualField.Type), selectedField)
-		} else {
-			v.error("Field Selection error: Interface type '%s' does not contain the field '%s'", intrface.Name, selectedField.Name)
-		}
+func (v *validator) validateFragmentSpread(fragmentSpread FragmentSpread) {
+	if _, err := v.document.GetFragment(fragmentSpread.Name); err != nil {
+		v.error("Fragment Spread error: Fragment '%s' is not defined", fragmentSpread.Name)
 	}
+	// TODO valid parent type spread & nesred ty
+}
 
-	for _, inlineFragment := range selectionSet.InlineFragments {
-		v.validateInlineFragment(inlineFragment)
+func (v *validator) validateInterfaceSelectionSet(intrface schema.Interface, selectionSet SelectionSet) {
+	if selectionSet.IsEmpty() {
+		v.error("Field Selection error: Interface type '%s' must have a subselection", intrface.Name)
+	} else {
+		for _, selectedField := range selectionSet.Fields {
+			if actualField, exists := intrface.Fields[selectedField.Name]; exists {
+				v.validateField(v.schema.GetDeclaration(actualField.Type), selectedField)
+				v.validateArguments(actualField, selectedField)
+			} else {
+				v.error("Field Selection error: Interface type '%s' does not contain the field '%s'", intrface.Name, selectedField.Name)
+			}
+		}
+
+		for _, inlineFragment := range selectionSet.InlineFragments {
+			v.validateInlineFragment(inlineFragment)
+		}
+
+		for _, fragmentSpread := range selectionSet.FragmentSpreads {
+			v.validateFragmentSpread(fragmentSpread)
+		}
 	}
 }
 
 func (v *validator) validateObjectSelectionSet(object schema.Object, selectionSet SelectionSet) {
-	for _, selectedField := range selectionSet.Fields {
-		if actualField, exists := object.Fields[selectedField.Name]; exists {
-			v.validateField(v.schema.GetDeclaration(actualField.Type), selectedField)
-		} else {
-			v.error("Field Selection error: Interface type '%s' does not contain the field '%s'", object.Name, selectedField.Name)
+	if selectionSet.IsEmpty() {
+		v.error("Field Selection error: Object type '%s' must have a subselection", object.Name)
+	} else {
+		for _, selectedField := range selectionSet.Fields {
+			if actualField, exists := object.Fields[selectedField.Name]; exists {
+				v.validateField(v.schema.GetDeclaration(actualField.Type), selectedField)
+				v.validateArguments(actualField, selectedField)
+			} else {
+				v.error("Field Selection error: Object type '%s' does not contain the field '%s'", object.Name, selectedField.Name)
+			}
 		}
-	}
 
-	for _, inlineFragment := range selectionSet.InlineFragments {
-		v.validateInlineFragment(inlineFragment)
+		for _, inlineFragment := range selectionSet.InlineFragments {
+			v.validateInlineFragment(inlineFragment)
+		}
+
+		for _, fragmentSpread := range selectionSet.FragmentSpreads {
+			v.validateFragmentSpread(fragmentSpread)
+		}
 	}
 }
 
 func (v *validator) validateUnionSelectionSet(union schema.Union, selectionSet SelectionSet) {
-	for _, selectedField := range selectionSet.Fields {
-		if selectedField.Name != "__typename" {
-			v.error("Field Selection error: cannot select non-metadata field from Union '%s'. Use fragment spreads to select fields from Union member types")
+	if selectionSet.IsEmpty() {
+		v.error("Field Selection error: Union type '%s' must have a subselection", union.Name)
+	} else {
+		for _, selectedField := range selectionSet.Fields {
+			if selectedField.Name != "__typename" {
+				v.error("Field Selection error: cannot select non-metadata field from Union '%s'. Use fragment spreads to select fields from Union member types", union.Name)
+			}
+		}
+
+		for _, inlineFragment := range selectionSet.InlineFragments {
+			v.validateInlineFragment(inlineFragment)
+		}
+
+		for _, fragmentSpread := range selectionSet.FragmentSpreads {
+			v.validateFragmentSpread(fragmentSpread)
 		}
 	}
+}
 
-	for _, inlineFragment := range selectionSet.InlineFragments {
-		v.validateInlineFragment(inlineFragment)
+func (v *validator) validateArguments(field schema.Field, selectedField Field) {
+	for argName := range selectedField.Arguments {
+		if _, exists := field.Arguments[argName]; !exists {
+			v.error("Field Argument error: provided invalid argument '%s' to field '%s'", argName, field.Name)
+		}
 	}
 }
 
@@ -147,8 +196,8 @@ func (v *validator) validateUnionSelectionSet(union schema.Union, selectionSet S
 //
 func (v *validator) validateFragment(fragment Fragment) {
 	// Fragment Name Uniqueness
-	if _, exists := v.operationNames[fragment.Name]; exists {
-		v.error("Fragment Name Uniqueness error: duplicate fragment definition found: %s", fragment.Name)
+	if _, exists := v.fragmentNames[fragment.Name]; exists {
+		v.error("Fragment Name Uniqueness error: duplicate fragment definition found '%s'", fragment.Name)
 	} else {
 		v.fragmentNames[fragment.Name] = EXISTS
 	}
@@ -157,16 +206,12 @@ func (v *validator) validateFragment(fragment Fragment) {
 	if declaration := v.schema.GetDeclaration(schema.DescribeType(fragment.Type)); declaration == nil {
 		v.error("Fragment Spread Type Existence error: target type '%s' does not exist in the schema", fragment.Type)
 	} else {
-		switch declaration.TypeKind() {
-		case schema.INTERFACE:
-		case schema.OBJECT:
-		case schema.UNION:
-		default:
-			v.error("Fragments On Composite Types error: target type must be UNION, INTERFACE, or OBJECT")
-		}
+		v.validateSelectionSet(declaration, fragment.SelectionSet)
 	}
+
+	//v.validateDirectives(fragment.Directives)
 }
 
 func (v *validator) error(format string, s ...interface{}) {
-	v.errors = append(v.errors, fmt.Errorf(format, s))
+	v.errors = append(v.errors, fmt.Errorf(format, s...))
 }

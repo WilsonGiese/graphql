@@ -41,8 +41,10 @@ func Tokenize(r io.Reader, ignoreWhitespace bool) ([]Token, error) {
 
 // lexer represents a lexical token scanner for GraphQL
 type lexer struct {
-	reader *bufio.Reader
-	// TODO Keep track of line & column indexes for errors, etc
+	reader      *bufio.Reader
+	line        int // Current reader line position
+	column      int // Current reader column position
+	savedColumn int // Previous reader column position before line increment
 }
 
 // Lexer errors
@@ -52,13 +54,15 @@ var errNotEnoughMatchingRunes = errors.New("not enough matching runes to read")
 // Also returns the literal text read for strings, numbers, and duration tokens
 // since these token types can have different literal representations.
 func (l *lexer) nextToken() (Token, error) {
-	var token Token
+	token := Token{Line: l.line, ColumnStart: l.column}
 
-	r, _, err := l.reader.ReadRune()
+	r, _, err := l.readRune()
 
 	if err != nil {
 		if err == io.EOF {
-			return Token{Type: EOF, Value: ""}, nil
+			token.Type = EOF
+			token.ColumnEnd = token.ColumnStart
+			return token, nil
 		}
 		return InvalidToken, err
 	}
@@ -67,34 +71,35 @@ func (l *lexer) nextToken() (Token, error) {
 
 	// Punctuators
 	case r == '{':
-		token = Token{Type: OpenBrace}
+		token.Type = OpenBrace
+		//token = tokeToken{Type: OpenBrace}
 	case r == '}':
-		token = Token{Type: ClosedBrace}
+		token.Type = ClosedBrace
 	case r == '(':
-		token = Token{Type: OpenParen}
+		token.Type = OpenParen
 	case r == ')':
-		token = Token{Type: ClosedParen}
+		token.Type = ClosedParen
 	case r == '[':
-		token = Token{Type: OpenBracket}
+		token.Type = OpenBracket
 	case r == ']':
-		token = Token{Type: ClosedBracket}
+		token.Type = ClosedBracket
 	case r == '=':
-		token = Token{Type: Equals}
+		token.Type = Equals
 	case r == '!':
-		token = Token{Type: Exclamation}
+		token.Type = Exclamation
 	case r == '$':
-		token = Token{Type: Dollar}
+		token.Type = Dollar
 	case r == ':':
-		token = Token{Type: Colon}
+		token.Type = Colon
 	case r == '@':
-		token = Token{Type: At}
+		token.Type = At
 	case r == '|':
-		token = Token{Type: VerticalBar}
+		token.Type = VerticalBar
 
 	// Spread "..."
 	case r == '.':
 		if s, err := l.consume(2, isPeriod); err == nil {
-			token = Token{Type: Spread}
+			token.Type = Spread
 		} else {
 			if err == io.EOF || err == errNotEnoughMatchingRunes {
 				return InvalidToken, fmt.Errorf("expected ... but found %c%s", r, s)
@@ -108,14 +113,14 @@ func (l *lexer) nextToken() (Token, error) {
 		// LineTerminator can be returned, but the next call to nextToken must fail
 		if nextr, _, err := l.peek(); err == nil {
 			if nextr == '\u000A' {
-				l.reader.ReadRune()
+				l.readRune()
 			}
 		} else if err != io.EOF {
 			return InvalidToken, err
 		}
 		fallthrough
 	case r == '\u000A':
-		token = Token{Type: LineTerminator}
+		token.Type = LineTerminator
 
 	// Insignificant comma & whitespace (space, tab)
 	case r == ',':
@@ -123,7 +128,7 @@ func (l *lexer) nextToken() (Token, error) {
 	case r == '\u0009':
 		fallthrough
 	case r == '\u0020':
-		token = Token{Type: Whitespace}
+		token.Type = Whitespace
 
 	// Name
 	case r == '_':
@@ -132,15 +137,17 @@ func (l *lexer) nextToken() (Token, error) {
 		fallthrough
 	case r >= 'A' && r <= 'Z':
 		if s, err := l.consumeAll(isNameCharacter); err == nil {
-			token = Token{Type: Name, Value: fmt.Sprintf("%c%s", r, s)} // TODO SPrintf seems weird, rethink this?
+			token.Type = Name
+			token.Value = fmt.Sprintf("%c%s", r, s)
 		} else {
 			return InvalidToken, err
 		}
 
 	// String
 	case r == '"':
-		if t, err := l.consumeString(); err == nil {
-			token = t
+		if value, err := l.consumeString(); err == nil {
+			token.Type = String
+			token.Value = value
 		} else {
 			return InvalidToken, err
 		}
@@ -149,8 +156,9 @@ func (l *lexer) nextToken() (Token, error) {
 	case r == '-':
 		fallthrough
 	case r >= '0' && r <= '9':
-		if t, err := l.consumeNumber(r); err == nil {
-			token = t
+		if value, t, err := l.consumeNumber(r); err == nil {
+			token.Type = t
+			token.Value = value
 		} else {
 			return InvalidToken, err
 		}
@@ -158,7 +166,7 @@ func (l *lexer) nextToken() (Token, error) {
 	// Comment
 	case r == '#':
 		if _, err := l.consumeAll(IsCommentCharacter); err == nil {
-			token = Token{Type: Comment}
+			token.Type = Comment
 		} else {
 			return InvalidToken, err
 		}
@@ -166,11 +174,15 @@ func (l *lexer) nextToken() (Token, error) {
 	// UnicodeBOM
 	// TODO what if a UnicodeBOM appears after the first rune in the input
 	case r == '\uFEFF':
-		token = Token{Type: UnicodeBOM}
-
+		token.Type = UnicodeBOM
 	// Invalid character for the start of a Token
 	default:
 		return InvalidToken, fmt.Errorf("invalid character: %c", r)
+	}
+	token.ColumnEnd = l.column - 1
+
+	if token.Type == LineTerminator {
+		l.incrementLine()
 	}
 
 	return token, nil
@@ -178,10 +190,10 @@ func (l *lexer) nextToken() (Token, error) {
 
 // peek returns the next rune from the Reader without consuming it
 func (l *lexer) peek() (rune, int, error) {
-	r, size, err := l.reader.ReadRune()
+	r, size, err := l.readRune()
 
 	if err == nil {
-		l.reader.UnreadRune()
+		l.unreadRune()
 		return r, size, nil
 	}
 	return r, size, err
@@ -195,7 +207,7 @@ func (l *lexer) consume(n int, matches func(rune) bool) (string, error) {
 	var consumed bytes.Buffer
 
 	for i := 0; i < n; i++ {
-		if r, _, err := l.reader.ReadRune(); err == nil {
+		if r, _, err := l.readRune(); err == nil {
 			consumed.WriteRune(r)
 			if !matches(r) {
 				return consumed.String(), errNotEnoughMatchingRunes
@@ -214,10 +226,10 @@ func (l *lexer) consumeAll(matches func(rune) bool) (string, error) {
 	var consumed bytes.Buffer
 
 	for {
-		if r, _, err := l.reader.ReadRune(); err == nil {
+		if r, _, err := l.readRune(); err == nil {
 			// If rune isn't a match, consider it unread and return everything else
 			if !matches(r) {
-				l.reader.UnreadRune()
+				l.unreadRune()
 				return consumed.String(), nil
 			}
 			consumed.WriteRune(r)
@@ -232,7 +244,7 @@ func (l *lexer) consumeAll(matches func(rune) bool) (string, error) {
 
 // consumeString attempts to consume a full string from lexer's Reader. Assumes
 // the starting double quote has already been read
-func (l *lexer) consumeString() (Token, error) {
+func (l *lexer) consumeString() (string, error) {
 	var value bytes.Buffer
 
 	// consume all string characters until a closing quotation mark is found.
@@ -243,28 +255,28 @@ func (l *lexer) consumeString() (Token, error) {
 		if s, err := l.consumeAll(isStringCharacter); err == nil {
 			value.WriteString(s)
 
-			if r, _, err := l.reader.ReadRune(); err == nil {
+			if r, _, err := l.readRune(); err == nil {
 				switch r {
 				// Final closing quotation; entire string has been consumed
 				case '"':
-					return Token{Type: String, Value: value.String()}, nil
+					return value.String(), nil
 				// Escape sequence
 				case '\\':
 					if err := l.consumeStringEscapeSequence(&value); err != nil {
-						return InvalidToken, err
+						return value.String(), err
 					}
 				// Invalid string input
 				default:
-					return InvalidToken, fmt.Errorf("invalid String: %s%c", value.String(), r)
+					return value.String(), fmt.Errorf("invalid String: %s%c", value.String(), r)
 				}
 			} else {
 				if err == io.EOF {
-					return InvalidToken, fmt.Errorf("invalid String: %s", value.String())
+					return value.String(), fmt.Errorf("invalid String: %s", value.String())
 				}
-				return InvalidToken, err
+				return value.String(), err
 			}
 		} else {
-			return InvalidToken, err
+			return value.String(), err
 		}
 	}
 }
@@ -274,7 +286,7 @@ func (l *lexer) consumeString() (Token, error) {
 // corressponding rune to the value buffer. Assumes the first forward Solidus
 // has already been read from the lexer's reader
 func (l *lexer) consumeStringEscapeSequence(value *bytes.Buffer) error {
-	r, _, err := l.reader.ReadRune()
+	r, _, err := l.readRune()
 
 	if err == nil {
 		// Escaped Unicode character sequence
@@ -313,7 +325,7 @@ func (l *lexer) consumeStringEscapeSequence(value *bytes.Buffer) error {
 // consumeNumber attempts to consume an integer or a float from the lexer's
 // Reader. Assumes the first rune has already been read and is contextually
 // important (unlike a String's first rune) so it is passed as an argument
-func (l *lexer) consumeNumber(first rune) (Token, error) {
+func (l *lexer) consumeNumber(first rune) (string, TokenType, error) {
 	var value bytes.Buffer
 	value.WriteRune(first)
 
@@ -326,59 +338,59 @@ func (l *lexer) consumeNumber(first rune) (Token, error) {
 	if nextRune, _, err := l.peek(); err == nil && isIntegerCharacter(nextRune) {
 		// Special case: if the integer part starts with -0 it can only be -0
 		if first == '-' && nextRune == '0' {
-			l.reader.ReadRune() // Discard the next rune which we know is 0
+			l.readRune() // Discard the next rune which we know is 0
 			value.WriteRune(nextRune)
 		} else if s, err := l.consumeAll(isIntegerCharacter); err == nil {
 			value.WriteString(s)
 		} else {
-			return InvalidToken, err
+			return value.String(), tokenType, err
 		}
 	} else if first == '-' {
 		if err == io.EOF {
 			if first == '-' {
-				return InvalidToken, fmt.Errorf("invalid Integer: -")
+				return value.String(), tokenType, fmt.Errorf("invalid Integer: -")
 			}
-			return Token{Type: tokenType, Value: value.String()}, nil
+			return value.String(), tokenType, nil
 		}
-		return InvalidToken, err
+		return value.String(), tokenType, err
 	}
 
 	// Fractional part
 	if nextRune, _, err := l.peek(); err == nil {
 		if nextRune == '.' {
-			l.reader.ReadRune() // Discard the next rune which we know is .
+			l.readRune() // Discard the next rune which we know is .
 			value.WriteRune(nextRune)
 
 			if fractionalPart, err := l.consumeAll(isIntegerCharacter); err == nil && fractionalPart != "" {
 				value.WriteString(fractionalPart)
 			} else {
-				return InvalidToken, fmt.Errorf("invalid Float: %s%s", value.String(), fractionalPart)
+				return value.String(), tokenType, fmt.Errorf("invalid Float: %s%s", value.String(), fractionalPart)
 			}
 
 			// Number is considered a Float type since it contains a fractional part
 			tokenType = Float
 		}
 	} else if err != io.EOF {
-		return InvalidToken, err
+		return value.String(), tokenType, err
 	}
 
 	// Exponent part
 	if nextRune, _, err := l.peek(); err == nil {
 		if nextRune == 'e' || nextRune == 'E' {
-			l.reader.ReadRune() // Discard the next rune which we know is e or E
+			l.readRune() // Discard the next rune which we know is e or E
 			value.WriteRune(nextRune)
 
 			// Exponent indicator may be followed by + or -
 			if nextRune, _, err := l.peek(); err == nil {
 				if nextRune == '+' || nextRune == '-' {
-					l.reader.ReadRune() // Discard the next rune which we know is + or -
+					l.readRune() // Discard the next rune which we know is + or -
 					value.WriteRune(nextRune)
 				}
 			} else {
 				if err == io.EOF {
-					return InvalidToken, fmt.Errorf("invalid Float: %s", value.String())
+					return value.String(), tokenType, fmt.Errorf("invalid Float: %s", value.String())
 				}
-				return InvalidToken, err
+				return value.String(), tokenType, err
 			}
 
 			// Exponent value
@@ -388,21 +400,52 @@ func (l *lexer) consumeNumber(first rune) (Token, error) {
 			// integers cannot start with 0 and be followed by other values
 			if exponentPart, err := l.consumeAll(isIntegerCharacter); err == nil {
 				if exponentPart == "" {
-					return InvalidToken, fmt.Errorf("invalid Float: %s", value.String())
+					return value.String(), tokenType, fmt.Errorf("invalid Float: %s", value.String())
 				}
 				value.WriteString(exponentPart)
 			} else {
-				return InvalidToken, err
+				return value.String(), tokenType, err
 			}
 
 			// Number is considered a Float type since it contains an exponent part
 			tokenType = Float
 		}
 	} else if err != io.EOF {
-		return InvalidToken, err
+		return value.String(), tokenType, err
 	}
 
-	return Token{Type: tokenType, Value: value.String()}, nil
+	return value.String(), tokenType, nil
+}
+
+func (l *lexer) readRune() (rune, int, error) {
+	l.incrementColumn()
+	return l.reader.ReadRune()
+}
+
+func (l *lexer) unreadRune() error {
+	l.undoLastIncrement()
+	return l.reader.UnreadRune()
+}
+
+func (l *lexer) incrementLine() {
+	l.line += 1
+	l.savedColumn = l.column
+	l.column = 0
+}
+
+func (l *lexer) incrementColumn() {
+	l.column += 1
+	l.savedColumn = -1
+}
+
+func (l *lexer) undoLastIncrement() {
+	// If savedColumn is -1 it idicates the last increment was a column increment
+	if l.savedColumn == -1 {
+		l.column -= 1
+	} else {
+		l.line -= 1
+		l.column = l.savedColumn
+	}
 }
 
 // isPeriod returns true if r == '.', false otherwise

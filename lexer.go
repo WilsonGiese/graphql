@@ -191,9 +191,9 @@ func (l *lexer) nextToken() (Token, error) {
 // peek returns the next rune from the Reader without consuming it
 func (l *lexer) peek() (rune, int, error) {
 	r, size, err := l.readRune()
+	l.unreadRune()
 
 	if err == nil {
-		l.unreadRune()
 		return r, size, nil
 	}
 	return r, size, err
@@ -235,6 +235,7 @@ func (l *lexer) consumeAll(matches func(rune) bool) (string, error) {
 			consumed.WriteRune(r)
 		} else {
 			if err == io.EOF {
+				l.unreadRune()
 				return consumed.String(), nil
 			}
 			return consumed.String(), err
